@@ -1,0 +1,10 @@
+{
+  "id": "callout-picker",
+  "name": "Callout Picker",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "A minimalist visual callout picker. Insert or wrap callouts with a single click.",
+  "author": "Ali Tekdemir",
+  "authorUrl": "https://github.com/alitekdemir",
+  "isDesktopOnly": false
+}
