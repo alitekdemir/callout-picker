@@ -18,7 +18,7 @@ export default class CalloutPickerPlugin extends Plugin {
       id: 'open-callout-picker',
       name: strings.commandName,
       editorCallback: (editor) => {
-        new CalloutPickerModal(this.app, editor, this.settings).open();
+        new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open();
       },
     });
 
@@ -27,8 +27,9 @@ export default class CalloutPickerPlugin extends Plugin {
         menu.addItem((item) => {
           item
             .setTitle(strings.contextMenuLabel)
-            .setIcon('box-select')
-            .onClick(() => new CalloutPickerModal(this.app, editor, this.settings).open());
+            .setIcon('quote-glyph')
+            .setSection('callout-picker')
+            .onClick(() => new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open());
         });
       }),
     );
