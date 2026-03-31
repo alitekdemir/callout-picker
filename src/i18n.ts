@@ -17,6 +17,7 @@ const translations = {
     langEn: 'İngilizce',
     aliasesLabel: 'Diğer adlar',
     // Fold toggle
+    foldLabel: 'Katlama',
     foldDefault: 'Varsayılan',
     foldOpen: 'Açık',
     foldClosed: 'Kapalı',
@@ -28,6 +29,7 @@ const translations = {
     sortCustom: '≡  Manuel',
     sortAlpha: '↓AZ  İsme göre',
     sortFrequency: '↕  Sık kullanılan',
+    sortSearchPlaceholder: 'Sıralama ara...',
     // First-line as title
     firstLineAsTitle: 'İlk satırı başlık yap',
     // Settings
@@ -66,6 +68,7 @@ const translations = {
     langEn: 'English',
     aliasesLabel: 'Aliases',
     // Fold toggle
+    foldLabel: 'Fold',
     foldDefault: 'Default',
     foldOpen: 'Open',
     foldClosed: 'Closed',
@@ -76,6 +79,7 @@ const translations = {
     // Sort dropdown
     sortCustom: '≡  Manual',
     sortAlpha: '↓AZ  By name',
+    sortSearchPlaceholder: 'Search sort...',
     sortFrequency: '↕  Most used',
     // First-line as title
     firstLineAsTitle: 'Use first line as title',

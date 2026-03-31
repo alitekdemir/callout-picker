@@ -107,16 +107,24 @@ export class CalloutPickerModal extends Modal {
     return { id, title, content };
   }
 
-  // Returns [full first editor line, second non-empty selection line]
-  // First line uses the full editor line (from col 0) so preview is never truncated
+  // Strip one level of blockquote + optional callout marker from a line
+  private stripQuotePrefix(line: string): string {
+    return line
+      .replace(/^>\s*\[![^\]]+\][+\-]?\s*/, '') // strip "> [!type]+ "
+      .replace(/^>\s*/, '');                      // strip remaining "> "
+  }
+
+  // Returns [full first editor line (cleaned), second non-empty selection line (cleaned)]
   private getSelectionLines(): [string, string] {
     const sel = this.editor.getSelection().trim();
     if (!sel) return ['', ''];
     const anchor = this.editor.getCursor('anchor');
     const head = this.editor.getCursor('head');
     const fromLine = Math.min(anchor.line, head.line);
-    const firstFullLine = this.editor.getLine(fromLine).trim();
-    const lines = sel.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const firstFullLine = this.stripQuotePrefix(this.editor.getLine(fromLine).trim());
+    const lines = sel.split('\n')
+      .map(l => this.stripQuotePrefix(l.trim()))
+      .filter(l => l.length > 0);
     return [firstFullLine || (lines[0] ?? ''), lines[1] ?? ''];
   }
 
@@ -176,7 +184,12 @@ export class CalloutPickerModal extends Modal {
     const selection = editor.getSelection();
 
     if (selection) {
-      const nonEmptyLines = selection.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      // Normalize: strip one level of "> " blockquote prefix before re-wrapping,
+      // so selections from within existing callouts don't produce doubled "> >"
+      const stripOne = (l: string) => l.replace(/^>\s*/, '');
+      const nonEmptyLines = selection.split('\n')
+        .map(l => this.stripQuotePrefix(l.trim()))
+        .filter(l => l.length > 0);
 
       if (firstLineAsTitle && nonEmptyLines.length > 0) {
         const titleText = this.expandTitle(nonEmptyLines[0]);
@@ -186,11 +199,12 @@ export class CalloutPickerModal extends Modal {
         let pastFirst = false;
         const bodyLines: string[] = [];
         for (const line of allLines) {
-          if (!pastFirst && line.trim() === nonEmptyLines[0]) {
+          const clean = this.stripQuotePrefix(line.trim());
+          if (!pastFirst && clean === nonEmptyLines[0]) {
             pastFirst = true;
             continue;
           }
-          if (pastFirst) bodyLines.push(`> ${line}`);
+          if (pastFirst) bodyLines.push(`> ${stripOne(line)}`);
         }
         const body = bodyLines.filter(l => l !== '> ').length > 0
           ? bodyLines.join('\n')
@@ -204,11 +218,11 @@ export class CalloutPickerModal extends Modal {
           : `> [!${calloutId}]${foldSuffix}`;
         if (paragraphs.length > 1) {
           const wrappedParas = paragraphs.map(para =>
-            para.split('\n').map(l => `> ${l}`).join('\n'),
+            para.split('\n').map(l => `> ${stripOne(l)}`).join('\n'),
           );
           editor.replaceSelection(`${header}\n${wrappedParas.join('\n>\n')}`);
         } else {
-          const wrapped = `${header}\n` + selection.split('\n').map(l => `> ${l}`).join('\n');
+          const wrapped = `${header}\n` + selection.split('\n').map(l => `> ${stripOne(l)}`).join('\n');
           editor.replaceSelection(wrapped);
         }
       }
