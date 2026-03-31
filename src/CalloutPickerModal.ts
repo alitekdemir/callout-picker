@@ -24,7 +24,7 @@ export class CalloutPickerModal extends Modal {
     const locale =
       this.settings.language === 'auto' ? detectLocale() : this.settings.language;
 
-    const existingCallout = this.detectExistingCallout();
+    const existingInfo = this.detectExistingCallout();
     const selectionWordCount = this.getSelectionWordCount();
     const hasMultipleParagraphs = this.checkMultipleParagraphs();
 
@@ -33,7 +33,9 @@ export class CalloutPickerModal extends Modal {
       props: {
         settings: this.settings,
         locale,
-        existingCallout,
+        existingCallout: existingInfo?.id ?? null,
+        existingCalloutTitle: existingInfo?.title ?? '',
+        existingCalloutFirstLine: existingInfo?.content ?? '',
         selectionWordCount,
         hasMultipleParagraphs,
         onSelect: async (
@@ -41,7 +43,7 @@ export class CalloutPickerModal extends Modal {
           fold: 'none' | 'open' | 'closed',
           firstParaAsTitle: boolean,
         ) => {
-          if (existingCallout !== null) {
+          if (existingInfo !== null) {
             this.replaceCalloutType(calloutId, fold);
           } else {
             this.insertCallout(calloutId, fold, firstParaAsTitle);
@@ -66,12 +68,18 @@ export class CalloutPickerModal extends Modal {
     this.contentEl.empty();
   }
 
-  // F9: detect if cursor is inside an existing callout header line
-  private detectExistingCallout(): string | null {
+  // Detect existing callout on cursor line; return id, title text, and first content line
+  private detectExistingCallout(): { id: string; title: string; content: string } | null {
     const cursor = this.editor.getCursor();
     const line = this.editor.getLine(cursor.line);
-    const match = line.match(/^>\s*\[!([^\]]+)\]/);
-    return match ? match[1].toLowerCase() : null;
+    const match = line.match(/^>\s*\[!([^\]]+?)([+-]?)]\s*(.*)?$/);
+    if (!match) return null;
+    const id = match[1].toLowerCase();
+    const title = (match[3] ?? '').trim();
+    const nextLine = this.editor.getLine(cursor.line + 1) ?? '';
+    const contentMatch = nextLine.match(/^>\s*(.*)/);
+    const content = contentMatch ? contentMatch[1].trim() : '';
+    return { id, title, content };
   }
 
   private getSelectionWordCount(): number {
@@ -86,23 +94,37 @@ export class CalloutPickerModal extends Modal {
     return selection.split(/\n\n+/).length > 1;
   }
 
-  // F12: expand {date} and {time} templates in titles
+  // Expand the current selection to include complete first and last lines
+  private expandSelectionToFullLines() {
+    const editor = this.editor;
+    const anchor = editor.getCursor('anchor');
+    const head = editor.getCursor('head');
+    const fromLine = Math.min(anchor.line, head.line);
+    const toLine = Math.max(anchor.line, head.line);
+    const toLineLength = editor.getLine(toLine).length;
+    // Preserve direction so undo works naturally
+    if (anchor.line <= head.line) {
+      editor.setSelection({ line: fromLine, ch: 0 }, { line: toLine, ch: toLineLength });
+    } else {
+      editor.setSelection({ line: toLine, ch: toLineLength }, { line: fromLine, ch: 0 });
+    }
+  }
+
+  // Expand {date} and {time} templates in titles
   private expandTitle(title: string): string {
     if (!title.includes('{')) return title;
     const now = new Date();
-    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const time = now.toTimeString().slice(0, 5);   // HH:MM
+    const date = now.toISOString().split('T')[0];
+    const time = now.toTimeString().slice(0, 5);
     return title.replace(/\{date\}/g, date).replace(/\{time\}/g, time);
   }
 
-  // Increment usage count for frequency sort
   private async updateUsage(calloutId: string) {
     if (!this.settings.usageCounts) this.settings.usageCounts = {};
     this.settings.usageCounts[calloutId] = (this.settings.usageCounts[calloutId] ?? 0) + 1;
     await this.saveSettings();
   }
 
-  // F9: replace existing callout type on current line
   private replaceCalloutType(newId: string, fold: 'none' | 'open' | 'closed') {
     const cursor = this.editor.getCursor();
     const line = this.editor.getLine(cursor.line);
@@ -114,7 +136,6 @@ export class CalloutPickerModal extends Modal {
     this.editor.setLine(cursor.line, newLine);
   }
 
-  // Insert callout with fold state, multi-paragraph support, and firstParaAsTitle
   private insertCallout(
     calloutId: string,
     fold: 'none' | 'open' | 'closed',
@@ -123,38 +144,39 @@ export class CalloutPickerModal extends Modal {
     const rawTitle = this.settings.calloutTitles[calloutId] ?? '';
     const foldSuffix = fold === 'open' ? '+' : fold === 'closed' ? '-' : '';
     const editor = this.editor;
+
+    if (editor.getSelection()) {
+      // Expand to full lines before inserting
+      this.expandSelectionToFullLines();
+    }
+
     const selection = editor.getSelection();
 
     if (selection) {
       const paragraphs = selection.split(/\n\n+/);
 
       if (paragraphs.length > 1 && firstParaAsTitle) {
-        // First paragraph becomes the callout title
         const titleText = this.expandTitle(paragraphs[0].trim());
         const header = `> [!${calloutId}]${foldSuffix} ${titleText}`;
         const bodyParas = paragraphs.slice(1).map(para =>
-          para.split('\n').map(line => `> ${line}`).join('\n'),
+          para.split('\n').map(l => `> ${l}`).join('\n'),
         );
-        const wrapped = `${header}\n${bodyParas.join('\n>\n')}`;
-        editor.replaceSelection(wrapped);
+        editor.replaceSelection(`${header}\n${bodyParas.join('\n>\n')}`);
       } else if (paragraphs.length > 1) {
-        // Each paragraph as a separate block inside the callout
         const title = this.expandTitle(rawTitle);
         const header = title
           ? `> [!${calloutId}]${foldSuffix} ${title}`
           : `> [!${calloutId}]${foldSuffix}`;
         const wrappedParas = paragraphs.map(para =>
-          para.split('\n').map(line => `> ${line}`).join('\n'),
+          para.split('\n').map(l => `> ${l}`).join('\n'),
         );
-        const wrapped = `${header}\n${wrappedParas.join('\n>\n')}`;
-        editor.replaceSelection(wrapped);
+        editor.replaceSelection(`${header}\n${wrappedParas.join('\n>\n')}`);
       } else {
         const title = this.expandTitle(rawTitle);
         const header = title
           ? `> [!${calloutId}]${foldSuffix} ${title}`
           : `> [!${calloutId}]${foldSuffix}`;
-        const lines = selection.split('\n');
-        const wrapped = `${header}\n` + lines.map(line => `> ${line}`).join('\n');
+        const wrapped = `${header}\n` + selection.split('\n').map(l => `> ${l}`).join('\n');
         editor.replaceSelection(wrapped);
       }
     } else {

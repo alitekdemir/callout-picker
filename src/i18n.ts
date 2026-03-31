@@ -4,6 +4,7 @@ const translations = {
   tr: {
     commandName: 'Callout Seçici',
     contextMenuLabel: 'Callout Ekle',
+    contextMenuReplaceLabel: 'Callout Değiştir',
     modalTitle: 'Callout Seç',
     settingsTitle: 'Callout Seçici Ayarları',
     settingsDesc: 'Her callout türü için varsayılan başlık belirleyin.',
@@ -15,25 +16,21 @@ const translations = {
     langTr: 'Türkçe',
     langEn: 'İngilizce',
     aliasesLabel: 'Diğer adlar',
-    // Context menu
-    insertAs: 'Olarak ekle',
     // Fold toggle
     foldDefault: 'Varsayılan',
     foldOpen: 'Açık',
     foldClosed: 'Kapalı',
     // Preview
-    previewLabel: 'Önizleme',
     previewContent: '...',
     // Wrapping indicator
     wrapping: 'Sarılıyor',
     // Replace mode
     replacingCallout: 'Değiştiriliyor',
-    // Sort
-    sortLabel: 'Sıralama',
+    // Sort tooltip
     sortCustom: 'Özel sıra',
-    sortAlpha: 'Alfabetik',
+    sortAlpha: 'A-Z',
     sortFrequency: 'Sık kullanılan',
-    // Multi-paragraph first-para as title
+    // First-para as title
     firstParaAsTitle: 'İlk paragrafı başlık yap',
     // Settings
     settingsColumnCount: 'Kolon Sayısı',
@@ -58,6 +55,7 @@ const translations = {
   en: {
     commandName: 'Callout Picker',
     contextMenuLabel: 'Insert Callout',
+    contextMenuReplaceLabel: 'Change Callout',
     modalTitle: 'Pick a Callout',
     settingsTitle: 'Callout Picker Settings',
     settingsDesc: 'Set a default title for each callout type.',
@@ -69,25 +67,21 @@ const translations = {
     langTr: 'Turkish',
     langEn: 'English',
     aliasesLabel: 'Aliases',
-    // Context menu
-    insertAs: 'Insert as',
     // Fold toggle
     foldDefault: 'Default',
     foldOpen: 'Open',
     foldClosed: 'Closed',
     // Preview
-    previewLabel: 'Preview',
     previewContent: '...',
     // Wrapping indicator
     wrapping: 'Wrapping',
     // Replace mode
     replacingCallout: 'Replacing',
-    // Sort
-    sortLabel: 'Sort',
+    // Sort tooltip
     sortCustom: 'Custom order',
-    sortAlpha: 'Alphabetical',
+    sortAlpha: 'A-Z',
     sortFrequency: 'Most used',
-    // Multi-paragraph first-para as title
+    // First-para as title
     firstParaAsTitle: 'Use first paragraph as title',
     // Settings
     settingsColumnCount: 'Column Count',

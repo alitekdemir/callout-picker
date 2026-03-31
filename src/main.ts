@@ -24,9 +24,13 @@ export default class CalloutPickerPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on('editor-menu', (menu, editor) => {
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+        const onCalloutLine = /^>\s*\[!/.test(line);
+
         menu.addItem((item) => {
           item
-            .setTitle(strings.contextMenuLabel)
+            .setTitle(onCalloutLine ? strings.contextMenuReplaceLabel : strings.contextMenuLabel)
             .setIcon('quote-glyph')
             .setSection('callout-picker')
             .onClick(() => new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open());
