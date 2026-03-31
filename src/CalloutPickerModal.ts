@@ -27,7 +27,7 @@ export class CalloutPickerModal extends Modal {
 
     const existingInfo = this.detectExistingCallout();
     const [selectionFirstLine, selectionSecondLine] = this.getSelectionLines();
-    const hasSelection = selectionFirstLine.length > 0 || this.editor.getSelection().trim().length > 0;
+    const hasSelection = this.editor.getSelection().trim().length > 0;
 
     this.svelteComponent = new CalloutPicker({
       target: contentEl,
@@ -58,26 +58,26 @@ export class CalloutPickerModal extends Modal {
           this.settings.sortMode = mode;
           await this.saveSettings();
         },
-        onMoveCallout: async (calloutId: string, direction: 'up' | 'down') => {
-          // Build the current ordered ID list
+        // Drag-drop reorder: move fromId to the position of toId
+        onReorderCallout: async (fromId: string, toId: string) => {
           const allIds = [
             ...CALLOUTS,
             ...(this.settings.customCallouts ?? []),
           ].map(c => c.id);
           const order = this.settings.calloutOrder?.length
             ? [...this.settings.calloutOrder]
-            : allIds;
+            : [...allIds];
 
-          const idx = order.indexOf(calloutId);
-          if (idx < 0) return;
-          const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-          if (targetIdx < 0 || targetIdx >= order.length) return;
+          const fromIdx = order.indexOf(fromId);
+          const toIdx = order.indexOf(toId);
+          if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
 
-          [order[idx], order[targetIdx]] = [order[targetIdx], order[idx]];
+          order.splice(fromIdx, 1);
+          order.splice(toIdx, 0, fromId);
+
           this.settings.calloutOrder = order;
           await this.saveSettings();
 
-          // Push updated settings back into the Svelte component
           if (this.svelteComponent) {
             this.svelteComponent.$set({ settings: { ...this.settings } });
           }
@@ -94,7 +94,6 @@ export class CalloutPickerModal extends Modal {
     this.contentEl.empty();
   }
 
-  // Detect existing callout on cursor line; return id, title text, first content line
   private detectExistingCallout(): { id: string; title: string; content: string } | null {
     const cursor = this.editor.getCursor();
     const line = this.editor.getLine(cursor.line);
@@ -108,7 +107,7 @@ export class CalloutPickerModal extends Modal {
     return { id, title, content };
   }
 
-  // Return first two non-empty lines of the current selection
+  // Returns the first two non-empty lines of the current selection
   private getSelectionLines(): [string, string] {
     const sel = this.editor.getSelection().trim();
     if (!sel) return ['', ''];
@@ -116,7 +115,7 @@ export class CalloutPickerModal extends Modal {
     return [lines[0] ?? '', lines[1] ?? ''];
   }
 
-  // Expand the selection to include complete first and last lines
+  // Expand selection to complete first and last lines before inserting
   private expandSelectionToFullLines() {
     const editor = this.editor;
     const anchor = editor.getCursor('anchor');
@@ -131,7 +130,6 @@ export class CalloutPickerModal extends Modal {
     }
   }
 
-  // Expand {date} and {time} templates in titles
   private expandTitle(title: string): string {
     if (!title.includes('{')) return title;
     const now = new Date();
@@ -176,12 +174,10 @@ export class CalloutPickerModal extends Modal {
       const nonEmptyLines = selection.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
       if (firstLineAsTitle && nonEmptyLines.length > 0) {
-        // First non-empty line → title; rest → body
         const titleText = this.expandTitle(nonEmptyLines[0]);
         const header = `> [!${calloutId}]${foldSuffix} ${titleText}`;
-        // Wrap all lines (body lines after first), keeping blank-line paragraph separation
+        // Wrap remaining lines, skipping the first non-empty line
         const allLines = selection.split('\n');
-        // Skip lines until past the first non-empty line, then wrap the rest
         let pastFirst = false;
         const bodyLines: string[] = [];
         for (const line of allLines) {
@@ -191,10 +187,11 @@ export class CalloutPickerModal extends Modal {
           }
           if (pastFirst) bodyLines.push(`> ${line}`);
         }
-        const body = bodyLines.length > 0 ? bodyLines.join('\n') : '> ';
+        const body = bodyLines.filter(l => l !== '> ').length > 0
+          ? bodyLines.join('\n')
+          : '> ';
         editor.replaceSelection(`${header}\n${body}`);
       } else {
-        // Wrap all selected lines
         const paragraphs = selection.split(/\n\n+/);
         const title = this.expandTitle(rawTitle);
         const header = title

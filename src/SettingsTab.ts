@@ -94,59 +94,121 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
       ...allCallouts.filter(c => !order.includes(c.id)),
     ];
 
-    for (let idx = 0; idx < orderedCallouts.length; idx++) {
-      const callout = orderedCallouts[idx];
-      const aliases = callout.aliases.length
-        ? `  —  ${strings.aliasesLabel}: ${callout.aliases.join(', ')}`
-        : '';
-
-      new Setting(containerEl)
-        .setName(callout.id.charAt(0).toUpperCase() + callout.id.slice(1))
-        .setDesc(`[!${callout.id}]${aliases}`)
-        .addText((text) => {
-          text
-            .setPlaceholder(strings.settingsPlaceholder)
-            .setValue(this.plugin.settings.calloutTitles[callout.id] ?? '')
-            .onChange(async (value) => {
-              if (value.trim()) {
-                this.plugin.settings.calloutTitles[callout.id] = value.trim();
-              } else {
-                delete this.plugin.settings.calloutTitles[callout.id];
-              }
-              await this.plugin.saveSettings();
-            });
-          // F12: template hint
-          text.inputEl.title = strings.settingsTitleTemplateHint;
-        })
-        .addExtraButton((btn) =>
-          btn
-            .setIcon('arrow-up')
-            .setTooltip('Move up')
-            .onClick(async () => {
-              const cur = this.getOrder();
-              const i = cur.indexOf(callout.id);
-              if (i <= 0) return;
-              [cur[i - 1], cur[i]] = [cur[i], cur[i - 1]];
-              this.plugin.settings.calloutOrder = cur;
-              await this.plugin.saveSettings();
-              this.display();
-            }),
-        )
-        .addExtraButton((btn) =>
-          btn
-            .setIcon('arrow-down')
-            .setTooltip('Move down')
-            .onClick(async () => {
-              const cur = this.getOrder();
-              const i = cur.indexOf(callout.id);
-              if (i < 0 || i >= cur.length - 1) return;
-              [cur[i], cur[i + 1]] = [cur[i + 1], cur[i]];
-              this.plugin.settings.calloutOrder = cur;
-              await this.plugin.saveSettings();
-              this.display();
-            }),
-        );
+    // Inject drag-drop styles once
+    if (!containerEl.ownerDocument.getElementById('cp-order-styles')) {
+      const style = containerEl.ownerDocument.createElement('style');
+      style.id = 'cp-order-styles';
+      style.textContent = `
+        .cp-order-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+        .cp-order-item {
+          display: flex; align-items: center; gap: 8px;
+          padding: 5px 8px; border-radius: 5px;
+          border: 1px solid var(--background-modifier-border);
+          background: var(--background-secondary);
+          cursor: default;
+        }
+        .cp-order-item.cp-drag-over {
+          border-color: var(--interactive-accent);
+          background: var(--background-modifier-hover);
+        }
+        .cp-order-item.cp-dragging { opacity: 0.4; }
+        .cp-order-grip {
+          font-size: 1em; color: var(--text-faint);
+          cursor: grab; flex-shrink: 0; user-select: none;
+        }
+        .cp-order-label {
+          flex: 1; font-size: 0.85em; color: var(--text-muted);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .cp-order-label strong { color: var(--text-normal); }
+        .cp-order-title {
+          width: 140px; flex-shrink: 0;
+          font-size: 0.82em; padding: 2px 6px;
+          border: 1px solid var(--background-modifier-border);
+          border-radius: 4px; background: var(--background-primary);
+          color: var(--text-normal);
+        }
+      `;
+      containerEl.ownerDocument.head.appendChild(style);
     }
+
+    const listEl = containerEl.createDiv({ cls: 'cp-order-list' });
+    let dragSrcId: string | null = null;
+
+    const buildRows = () => {
+      listEl.empty();
+      const cur = this.getOrder();
+      const curCallouts = [
+        ...cur.map(id => allCallouts.find(c => c.id === id)).filter(
+          (c): c is (typeof allCallouts)[number] => c !== undefined,
+        ),
+        ...allCallouts.filter(c => !cur.includes(c.id)),
+      ];
+
+      for (const callout of curCallouts) {
+        const row = listEl.createDiv({ cls: 'cp-order-item' });
+        row.setAttribute('draggable', 'true');
+        row.dataset.id = callout.id;
+
+        const grip = row.createSpan({ cls: 'cp-order-grip', text: '⠿' });
+        grip.title = 'Drag to reorder';
+
+        const label = row.createSpan({ cls: 'cp-order-label' });
+        label.innerHTML = `<strong>${callout.id}</strong>`;
+        if (callout.aliases.length) {
+          label.innerHTML += `  —  <span style="color:var(--text-faint)">${callout.aliases.join(', ')}</span>`;
+        }
+
+        const titleInput = row.createEl('input', { cls: 'cp-order-title' }) as HTMLInputElement;
+        titleInput.type = 'text';
+        titleInput.placeholder = strings.settingsPlaceholder;
+        titleInput.title = strings.settingsTitleTemplateHint;
+        titleInput.value = this.plugin.settings.calloutTitles[callout.id] ?? '';
+        titleInput.addEventListener('change', async () => {
+          const val = titleInput.value.trim();
+          if (val) {
+            this.plugin.settings.calloutTitles[callout.id] = val;
+          } else {
+            delete this.plugin.settings.calloutTitles[callout.id];
+          }
+          await this.plugin.saveSettings();
+        });
+
+        row.addEventListener('dragstart', (e) => {
+          dragSrcId = callout.id;
+          row.addClass('cp-dragging');
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        });
+        row.addEventListener('dragend', () => {
+          dragSrcId = null;
+          row.removeClass('cp-dragging');
+          listEl.querySelectorAll('.cp-drag-over').forEach(el => el.removeClass('cp-drag-over'));
+        });
+        row.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          if (dragSrcId && dragSrcId !== callout.id) {
+            row.addClass('cp-drag-over');
+          }
+        });
+        row.addEventListener('dragleave', () => row.removeClass('cp-drag-over'));
+        row.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          row.removeClass('cp-drag-over');
+          if (!dragSrcId || dragSrcId === callout.id) return;
+          const o = this.getOrder();
+          const fromIdx = o.indexOf(dragSrcId);
+          const toIdx = o.indexOf(callout.id);
+          if (fromIdx < 0 || toIdx < 0) return;
+          o.splice(fromIdx, 1);
+          o.splice(toIdx, 0, dragSrcId);
+          this.plugin.settings.calloutOrder = o;
+          await this.plugin.saveSettings();
+          buildRows();
+        });
+      }
+    };
+
+    buildRows();
 
     containerEl.createEl('hr');
 

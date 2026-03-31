@@ -9,7 +9,7 @@
   export let onSelect: (id: string, fold: 'none' | 'open' | 'closed', firstLineAsTitle: boolean) => void;
   export let onClose: () => void;
   export let onSortChange: (mode: 'custom' | 'alpha' | 'frequency') => void;
-  export let onMoveCallout: (id: string, direction: 'up' | 'down') => void;
+  export let onReorderCallout: (fromId: string, toId: string) => void;
   export let hasSelection: boolean = false;
   export let selectionFirstLine: string = '';
   export let selectionSecondLine: string = '';
@@ -25,7 +25,11 @@
   let hoveredAlias: string | null = null;
   let sortMode: 'custom' | 'alpha' | 'frequency' = settings.sortMode ?? 'custom';
 
-  // Pass sortMode + settings explicitly so Svelte tracks them as reactive dependencies
+  // Drag-drop state
+  let dragSourceIndex: number | null = null;
+  let dragOverIndex: number | null = null;
+
+  // Pass sortMode + settings explicitly so Svelte tracks them as reactive deps
   function getSortedCallouts(mode: typeof sortMode, s: PluginSettings): CalloutDef[] {
     const custom = (s.customCallouts ?? []).map(c => ({
       id: c.id, aliases: c.aliases, color: c.color, icon: '', iconPath: c.iconPath,
@@ -39,7 +43,7 @@
       const counts = s.usageCounts ?? {};
       return [...all].sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0));
     }
-    // custom: apply persisted order
+    // custom order
     const order = s.calloutOrder ?? [];
     if (!order.length) return all;
     const ordered = order
@@ -54,7 +58,7 @@
   $: cols = settings.columnCount ?? 3;
   $: focusedCallout = displayCallouts[focusedIndex] ?? null;
 
-  // Which id to preview: alias hover takes priority, then focused card
+  // Which id to preview: alias hover > focused card
   $: activePreviewId = hoveredAlias ?? focusedCallout?.id ?? null;
   $: ownerCallout = activePreviewId
     ? (displayCallouts.find(c => c.id === activePreviewId)
@@ -63,24 +67,22 @@
     : focusedCallout;
   $: previewColor = ownerCallout?.color ?? '#888';
 
-  // Preview line 1: > [!id][fold] [title]
-  $: previewTitleText = (() => {
-    if (firstLineAsTitle && selectionFirstLine) return selectionFirstLine;
-    if (ownerCallout && settings.calloutTitles[ownerCallout.id]) return settings.calloutTitles[ownerCallout.id];
-    if (existingCalloutTitle) return existingCalloutTitle;
-    return '';
-  })();
-  $: previewLine1 = activePreviewId
-    ? `> [!${activePreviewId}]${foldState === 'open' ? '+' : foldState === 'closed' ? '-' : ''}${previewTitleText ? ' ' + previewTitleText : ''}`
+  // Preview line 1 title: firstLineAsTitle > settings title > existing title
+  $: activeTitleText =
+    (firstLineAsTitle && selectionFirstLine) ? selectionFirstLine
+    : (ownerCallout && settings.calloutTitles[ownerCallout?.id ?? '']) ? settings.calloutTitles[ownerCallout.id]
+    : existingCalloutTitle ? existingCalloutTitle
     : '';
 
-  // Preview line 2: actual content
-  $: previewLine2 = (() => {
-    if (firstLineAsTitle && selectionSecondLine) return `> ${selectionSecondLine}`;
-    if (existingCalloutFirstLine) return `> ${existingCalloutFirstLine}`;
-    if (selectionSecondLine) return `> ${selectionSecondLine}`;
-    return `> ${strings.previewContent}`;
-  })();
+  $: previewLine1 = activePreviewId
+    ? `> [!${activePreviewId}]${foldState === 'open' ? '+' : foldState === 'closed' ? '-' : ''}${activeTitleText ? ' ' + activeTitleText : ''}`
+    : '';
+
+  // Preview line 2: when firstLineAsTitle, show second selection line; else existing content or placeholder
+  $: previewLine2 = (firstLineAsTitle && selectionSecondLine) ? `> ${selectionSecondLine}`
+    : existingCalloutFirstLine ? `> ${existingCalloutFirstLine}`
+    : selectionSecondLine ? `> ${selectionSecondLine}`
+    : `> ${strings.previewContent}`;
 
   onMount(() => { gridEl?.focus(); });
 
@@ -107,6 +109,34 @@
   function handleSortChange(e: Event) {
     sortMode = (e.target as HTMLSelectElement).value as typeof sortMode;
     onSortChange(sortMode);
+  }
+
+  // ── Drag-drop (custom mode only) ──
+  function handleDragStart(e: DragEvent, index: number) {
+    if (sortMode !== 'custom') return;
+    dragSourceIndex = index;
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e: DragEvent, index: number) {
+    if (sortMode !== 'custom' || dragSourceIndex === null) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    dragOverIndex = index;
+  }
+
+  function handleDrop(e: DragEvent, index: number) {
+    e.preventDefault();
+    if (dragSourceIndex !== null && dragSourceIndex !== index) {
+      onReorderCallout(displayCallouts[dragSourceIndex].id, displayCallouts[index].id);
+    }
+    dragSourceIndex = null;
+    dragOverIndex = null;
+  }
+
+  function handleDragEnd() {
+    dragSourceIndex = null;
+    dragOverIndex = null;
   }
 </script>
 
@@ -151,7 +181,7 @@
   </div>
 </div>
 
-<!-- ===== FIRST-LINE AS TITLE CHECKBOX (any selection) ===== -->
+<!-- ===== FIRST-LINE AS TITLE CHECKBOX ===== -->
 {#if hasSelection}
   <!-- svelte-ignore a11y-label-has-associated-control -->
   <label class="cp-first-line">
@@ -176,17 +206,27 @@
       class="cp-card"
       class:cp-card--focused={focusedIndex === i}
       class:cp-card--filled={settings.cardStyle === 'filled'}
+      class:cp-card--drag-over={dragOverIndex === i && dragSourceIndex !== i}
+      class:cp-card--dragging={dragSourceIndex === i}
       role="option"
       aria-selected={focusedIndex === i}
       tabindex="-1"
+      draggable={sortMode === 'custom'}
       style="--callout-color: {callout.color}"
       title={callout.aliases.length ? callout.aliases.join(', ') : undefined}
       on:click={() => handleCardClick(i)}
       on:mouseenter={() => { focusedIndex = i; hoveredAlias = null; }}
+      on:dragstart={(e) => handleDragStart(e, i)}
+      on:dragover={(e) => handleDragOver(e, i)}
+      on:drop={(e) => handleDrop(e, i)}
+      on:dragend={handleDragEnd}
     >
       <div class="cp-card__accent" />
       <div class="cp-card__body">
         <div class="cp-card__header">
+          {#if sortMode === 'custom'}
+            <span class="cp-drag-grip" title="Drag to reorder">⠿</span>
+          {/if}
           <svg
             class="cp-card__icon"
             viewBox="0 0 24 24"
@@ -223,26 +263,6 @@
           <span class="cp-card__default-title">"{settings.calloutTitles[callout.id]}"</span>
         {/if}
       </div>
-
-      <!-- Move up/down buttons (custom mode only) -->
-      {#if sortMode === 'custom'}
-        <div class="cp-card-move">
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <button
-            class="cp-move-btn"
-            on:click|stopPropagation={() => onMoveCallout(callout.id, 'up')}
-            title="Move up"
-            tabindex="-1"
-          >▲</button>
-          <!-- svelte-ignore a11y-click-events-have-key-events -->
-          <button
-            class="cp-move-btn"
-            on:click|stopPropagation={() => onMoveCallout(callout.id, 'down')}
-            title="Move down"
-            tabindex="-1"
-          >▼</button>
-        </div>
-      {/if}
     </div>
   {/each}
 </div>
@@ -285,7 +305,7 @@
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
     background: var(--background-secondary); color: var(--text-normal);
-    font-size: 0.78em; cursor: pointer; max-width: 130px;
+    font-size: 0.78em; cursor: pointer; max-width: 140px;
   }
 
   /* ── Fold toggle ── */
@@ -307,7 +327,7 @@
     z-index: 1; position: relative;
   }
 
-  /* ── First-line as title checkbox ── */
+  /* ── First-line as title ── */
   .cp-first-line {
     display: flex; align-items: center; gap: 6px;
     font-size: 0.82em; color: var(--text-muted);
@@ -328,11 +348,18 @@
     border-radius: 6px; border: 2px solid transparent;
     background: var(--background-secondary);
     cursor: pointer;
-    transition: border-color 0.1s, background 0.1s;
+    transition: border-color 0.1s, background 0.1s, opacity 0.1s;
     overflow: hidden;
   }
   .cp-card:hover, .cp-card--focused {
     border-color: var(--callout-color);
+    background: var(--background-secondary-alt);
+  }
+  /* Drag states */
+  .cp-card--dragging { opacity: 0.4; cursor: grabbing; }
+  .cp-card--drag-over {
+    border-color: var(--callout-color);
+    border-style: dashed;
     background: var(--background-secondary-alt);
   }
 
@@ -343,6 +370,7 @@
   }
   .cp-card--filled .cp-card__icon { color: rgba(255,255,255,0.95); }
   .cp-card--filled .cp-card__name { color: rgba(255,255,255,0.95); }
+  .cp-card--filled .cp-drag-grip { color: rgba(255,255,255,0.5); }
   .cp-card--filled .cp-card__alias-chip {
     background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.88);
     border-color: rgba(255,255,255,0.3);
@@ -357,10 +385,18 @@
   .cp-card__body {
     display: flex; flex-direction: column; justify-content: center;
     gap: 3px; padding: 7px 9px; flex: 1; overflow: hidden;
-    /* Leave room for move buttons */
-    padding-right: 28px;
   }
   .cp-card__header { display: flex; align-items: center; gap: 5px; }
+
+  /* Drag grip shown in custom mode */
+  .cp-drag-grip {
+    font-size: 0.85em; color: var(--text-faint);
+    cursor: grab; flex-shrink: 0; line-height: 1;
+    opacity: 0; transition: opacity 0.1s;
+  }
+  .cp-card:hover .cp-drag-grip { opacity: 1; }
+  .cp-card--dragging .cp-drag-grip { opacity: 1; cursor: grabbing; }
+
   .cp-card__icon { width: 14px; height: 14px; color: var(--callout-color); flex-shrink: 0; }
   .cp-card__name {
     font-size: 0.85em; font-weight: 700;
@@ -383,28 +419,6 @@
   .cp-card__default-title {
     font-size: 0.68em; color: var(--callout-color);
     font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-
-  /* ── Move up/down buttons (custom sort mode) ── */
-  .cp-card-move {
-    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
-    display: flex; flex-direction: column; gap: 1px;
-    opacity: 0; transition: opacity 0.1s; pointer-events: none;
-  }
-  .cp-card:hover .cp-card-move {
-    opacity: 1; pointer-events: auto;
-  }
-  .cp-move-btn {
-    display: flex; align-items: center; justify-content: center;
-    width: 18px; height: 16px;
-    padding: 0; border: 1px solid var(--background-modifier-border);
-    border-radius: 3px;
-    background: var(--background-primary); color: var(--text-faint);
-    cursor: pointer; font-size: 0.55em; line-height: 1;
-    transition: background 0.1s, color 0.1s;
-  }
-  .cp-move-btn:hover {
-    background: var(--callout-color); color: #fff; border-color: var(--callout-color);
   }
 
   /* ── Preview ── */

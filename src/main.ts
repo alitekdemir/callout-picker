@@ -10,13 +10,9 @@ export default class CalloutPickerPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    const locale =
-      this.settings.language === 'auto' ? detectLocale() : this.settings.language;
-    const strings = t(locale);
-
     this.addCommand({
       id: 'open-callout-picker',
-      name: strings.commandName,
+      name: 'Callout Picker',
       editorCallback: (editor) => {
         new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open();
       },
@@ -24,6 +20,10 @@ export default class CalloutPickerPlugin extends Plugin {
 
     this.registerEvent(
       this.app.workspace.on('editor-menu', (menu, editor) => {
+        const locale =
+          this.settings.language === 'auto' ? detectLocale() : this.settings.language;
+        const strings = t(locale);
+
         const cursor = editor.getCursor();
         const line = editor.getLine(cursor.line);
         const onCalloutLine = /^>\s*\[!/.test(line);
@@ -32,8 +32,9 @@ export default class CalloutPickerPlugin extends Plugin {
           item
             .setTitle(onCalloutLine ? strings.contextMenuReplaceLabel : strings.contextMenuLabel)
             .setIcon('quote-glyph')
-            .setSection('callout-picker')
-            .onClick(() => new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open());
+            .onClick(() =>
+              new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open(),
+            );
         });
       }),
     );
