@@ -2,7 +2,6 @@ import { App, Editor, Modal } from 'obsidian';
 import type { SvelteComponent } from 'svelte';
 import { detectLocale } from './i18n';
 import type { PluginSettings } from './types';
-import { CALLOUTS } from './calloutData';
 import CalloutPicker from './components/CalloutPicker.svelte';
 
 export class CalloutPickerModal extends Modal {
@@ -58,26 +57,9 @@ export class CalloutPickerModal extends Modal {
           this.settings.sortMode = mode;
           await this.saveSettings();
         },
-        // Drag-drop reorder: move fromId to the position of toId
-        onReorderCallout: async (fromId: string, toId: string) => {
-          const allIds = [
-            ...CALLOUTS,
-            ...(this.settings.customCallouts ?? []),
-          ].map(c => c.id);
-          const order = this.settings.calloutOrder?.length
-            ? [...this.settings.calloutOrder]
-            : [...allIds];
-
-          const fromIdx = order.indexOf(fromId);
-          const toIdx = order.indexOf(toId);
-          if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
-
-          order.splice(fromIdx, 1);
-          order.splice(toIdx, 0, fromId);
-
-          this.settings.calloutOrder = order;
+        onReorderCallout: async (newOrder: string[]) => {
+          this.settings.calloutOrder = newOrder;
           await this.saveSettings();
-
           if (this.svelteComponent) {
             this.svelteComponent.$set({ settings: { ...this.settings } });
           }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { dndzone } from 'svelte-dnd-action';
   import { CALLOUTS, type CalloutDef } from '../calloutData';
   import { t, type Locale } from '../i18n';
   import type { PluginSettings } from '../types';
@@ -9,7 +10,7 @@
   export let onSelect: (id: string, fold: 'none' | 'open' | 'closed', firstLineAsTitle: boolean) => void;
   export let onClose: () => void;
   export let onSortChange: (mode: 'custom' | 'alpha' | 'frequency') => void;
-  export let onReorderCallout: (fromId: string, toId: string) => void;
+  export let onReorderCallout: (newOrder: string[]) => void;
   export let hasSelection: boolean = false;
   export let selectionFirstLine: string = '';
   export let selectionSecondLine: string = '';
@@ -30,9 +31,10 @@
   let sortSearch = '';
   let sortInputEl: HTMLInputElement;
 
-  // Drag-drop state
-  let dragSourceIndex: number | null = null;
-  let dragOverIndex: number | null = null;
+  // Drag-drop state (svelte-dnd-action)
+  const FLIP_DURATION_MS = 200;
+  let isDragging = false;
+  let dndItems: CalloutDef[] = [];
 
   function getSortedCallouts(mode: typeof sortMode, s: PluginSettings): CalloutDef[] {
     const custom = (s.customCallouts ?? []).map(c => ({
@@ -50,15 +52,16 @@
     return [...ordered, ...all.filter(c => !order.includes(c.id))];
   }
 
-  $: displayCallouts = getSortedCallouts(sortMode, settings);
-  $: count = displayCallouts.length;
+  $: sortedCallouts = getSortedCallouts(sortMode, settings);
+  $: if (!isDragging) dndItems = sortedCallouts;
+  $: count = dndItems.length;
   $: cols = settings.columnCount ?? 3;
-  $: focusedCallout = displayCallouts[focusedIndex] ?? null;
+  $: focusedCallout = dndItems[focusedIndex] ?? null;
 
   $: activePreviewId = hoveredAlias ?? focusedCallout?.id ?? null;
   $: ownerCallout = activePreviewId
-    ? (displayCallouts.find(c => c.id === activePreviewId)
-       ?? displayCallouts.find(c => c.aliases.includes(activePreviewId as string))
+    ? (dndItems.find(c => c.id === activePreviewId)
+       ?? dndItems.find(c => c.aliases.includes(activePreviewId as string))
        ?? focusedCallout)
     : focusedCallout;
   $: previewColor = ownerCallout?.color ?? '#888';
@@ -104,7 +107,7 @@
       case 'Enter':
       case ' ':
         e.preventDefault();
-        if (count > 0) onSelect(displayCallouts[focusedIndex].id, foldState, firstLineAsTitle);
+        if (count > 0) onSelect(dndItems[focusedIndex].id, foldState, firstLineAsTitle);
         break;
       case 'Escape': e.preventDefault(); onClose(); break;
     }
@@ -112,7 +115,7 @@
 
   function handleCardClick(index: number) {
     focusedIndex = index;
-    onSelect(displayCallouts[index].id, foldState, firstLineAsTitle);
+    onSelect(dndItems[index].id, foldState, firstLineAsTitle);
   }
 
   function openSort() {
@@ -129,26 +132,16 @@
     onSortChange(mode);
   }
 
-  // Drag-drop
-  function handleDragStart(e: DragEvent, index: number) {
-    if (sortMode !== 'custom') return;
-    dragSourceIndex = index;
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  // svelte-dnd-action handlers
+  function handleDndConsider(e: CustomEvent) {
+    isDragging = true;
+    dndItems = e.detail.items;
   }
-  function handleDragOver(e: DragEvent, index: number) {
-    if (sortMode !== 'custom' || dragSourceIndex === null) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    dragOverIndex = index;
+  function handleDndFinalize(e: CustomEvent) {
+    isDragging = false;
+    dndItems = e.detail.items;
+    onReorderCallout(dndItems.map((c: CalloutDef) => c.id));
   }
-  function handleDrop(e: DragEvent, index: number) {
-    e.preventDefault();
-    if (dragSourceIndex !== null && dragSourceIndex !== index)
-      onReorderCallout(displayCallouts[dragSourceIndex].id, displayCallouts[index].id);
-    dragSourceIndex = null;
-    dragOverIndex = null;
-  }
-  function handleDragEnd() { dragSourceIndex = null; dragOverIndex = null; }
 </script>
 
 <!-- ===== ROW 1: Title + hint ===== -->
@@ -253,27 +246,23 @@
   bind:this={gridEl}
   style="--cols: {cols}"
   on:keydown={handleKeydown}
+  use:dndzone={{ items: dndItems, flipDurationMs: FLIP_DURATION_MS, disabled: sortMode !== 'custom', dropTargetStyle: {} }}
+  on:consider={handleDndConsider}
+  on:finalize={handleDndFinalize}
 >
-  {#each displayCallouts as callout, i}
+  {#each dndItems as callout, i (callout.id)}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <div
       class="cp-card"
       class:cp-card--focused={focusedIndex === i}
       class:cp-card--filled={settings.cardStyle === 'filled'}
-      class:cp-card--drag-over={dragOverIndex === i && dragSourceIndex !== i}
-      class:cp-card--dragging={dragSourceIndex === i}
       role="option"
       aria-selected={focusedIndex === i}
       tabindex="-1"
-      draggable={sortMode === 'custom'}
       style="--callout-color: {callout.color}"
       title={callout.aliases.length ? callout.aliases.join(', ') : undefined}
       on:click={() => handleCardClick(i)}
       on:mouseenter={() => { focusedIndex = i; hoveredAlias = null; }}
-      on:dragstart={(e) => handleDragStart(e, i)}
-      on:dragover={(e) => handleDragOver(e, i)}
-      on:drop={(e) => handleDrop(e, i)}
-      on:dragend={handleDragEnd}
     >
       <div class="cp-card__accent" />
       <div class="cp-card__body">
