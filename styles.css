@@ -2,8 +2,8 @@
 
 .callout-picker-modal .modal-content {
   padding: 20px;
-  min-width: 400px;
-  max-width: 520px;
+  min-width: 440px;
+  max-width: 620px;
 }
 
 /* Remove default modal title bar gap when using custom header */

@@ -4,6 +4,7 @@ export interface CalloutDef {
   color: string;
   icon: string;
   iconPath: string;
+  fillIcon?: boolean; // true = use fill="currentColor" instead of stroke (for filled shape icons)
 }
 
 export const CALLOUTS: CalloutDef[] = [
@@ -32,5 +33,5 @@ export const CALLOUTS: CalloutDef[] = [
   { id: 'example', aliases: [], color: '#7c4dff', icon: 'list',
     iconPath: 'M3 12h.01 M3 18h.01 M3 6h.01 M8 12h13 M8 18h13 M8 6h13' },
   { id: 'quote', aliases: ['cite'], color: '#9e9e9e', icon: 'quote',
-    iconPath: '3 21c-1 0-1.5-.5-1.5-1.5v-4c0-1 .5-2 1.5-2h4c1 0 1.5.5 1.5 1.5v4C9 20.5 8.5 21 7.5 21H3zM3 3.5C3 2.5 3.5 2 4.5 2h4C9.5 2 10 2.5 10 3.5V7c0 1-.5 1.5-1.5 1.5h-4C3.5 8.5 3 8 3 7V3.5zM14 21c-1 0-1.5-.5-1.5-1.5v-4c0-1 .5-2 1.5-2h4c1 0 1.5.5 1.5 1.5v4c0 1-.5 1.5-1.5 1.5h-4zM14 3.5C14 2.5 14.5 2 15.5 2h4C20.5 2 21 2.5 21 3.5V7c0 1-.5 1.5-1.5 1.5h-4C14.5 8.5 14 8 14 7V3.5z' },
+    iconPath: 'M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z' },
 ];
