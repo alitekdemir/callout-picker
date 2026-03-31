@@ -28,8 +28,6 @@
 
   // Sort combobox state
   let sortOpen = false;
-  let sortSearch = '';
-  let sortInputEl: HTMLInputElement;
 
   // Drag-drop state (svelte-dnd-action)
   const FLIP_DURATION_MS = 200;
@@ -90,15 +88,12 @@
     { value: 'alpha' as const,     label: strings.sortAlpha },
     { value: 'frequency' as const, label: strings.sortFrequency },
   ];
-  $: filteredSortOptions = sortSearch.trim()
-    ? sortOptions.filter(o => o.label.toLowerCase().includes(sortSearch.toLowerCase()))
-    : sortOptions;
   $: currentSortLabel = sortOptions.find(o => o.value === sortMode)?.label ?? strings.sortCustom;
 
   onMount(() => { gridEl?.focus(); });
 
   function handleKeydown(e: KeyboardEvent) {
-    if (sortOpen) { if (e.key === 'Escape') { sortOpen = false; sortSearch = ''; } return; }
+    if (sortOpen) { if (e.key === 'Escape') { sortOpen = false; } return; }
     switch (e.key) {
       case 'ArrowRight': e.preventDefault(); focusedIndex = (focusedIndex + 1) % count; break;
       case 'ArrowLeft':  e.preventDefault(); focusedIndex = (focusedIndex - 1 + count) % count; break;
@@ -120,15 +115,11 @@
 
   function openSort() {
     sortOpen = true;
-    sortSearch = '';
-    // Focus search input on next tick
-    setTimeout(() => sortInputEl?.focus(), 0);
   }
 
   function selectSort(mode: typeof sortMode) {
     sortMode = mode;
     sortOpen = false;
-    sortSearch = '';
     onSortChange(mode);
   }
 
@@ -194,44 +185,24 @@
     {#if sortOpen}
       <!-- svelte-ignore a11y-click-events-have-key-events -->
       <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div class="cp-sort-backdrop" on:click={() => { sortOpen = false; sortSearch = ''; }} />
+      <div class="cp-sort-backdrop" on:click={() => { sortOpen = false; }} />
       <div class="cp-sort-popover" role="listbox">
-        <!-- Search input -->
-        <div class="cp-sort-search-wrap">
-          <svg class="cp-sort-search-icon" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            class="cp-sort-search"
-            type="text"
-            placeholder={strings.sortSearchPlaceholder}
-            bind:this={sortInputEl}
-            bind:value={sortSearch}
-          />
-        </div>
-        <div class="cp-sort-divider" />
-        <!-- Options -->
-        {#if filteredSortOptions.length === 0}
-          <div class="cp-sort-empty">—</div>
-        {:else}
-          {#each filteredSortOptions as opt}
-            <button
-              class="cp-sort-item"
-              class:selected={sortMode === opt.value}
-              role="option"
-              aria-selected={sortMode === opt.value}
-              on:click={() => selectSort(opt.value)}
-            >
-              <svg class="cp-sort-check" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                style="opacity: {sortMode === opt.value ? 1 : 0}">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span>{opt.label}</span>
-            </button>
-          {/each}
-        {/if}
+        {#each sortOptions as opt}
+          <button
+            class="cp-sort-item"
+            class:selected={sortMode === opt.value}
+            role="option"
+            aria-selected={sortMode === opt.value}
+            on:click={() => selectSort(opt.value)}
+          >
+            <svg class="cp-sort-check" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+              style="opacity: {sortMode === opt.value ? 1 : 0}">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>{opt.label}</span>
+          </button>
+        {/each}
       </div>
     {/if}
   </div>
