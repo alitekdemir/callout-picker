@@ -29,6 +29,7 @@ const context = await esbuild.context({
   target: "es2018",
   logLevel: "info",
   sourcemap: process.env.NODE_ENV !== "production" ? "inline" : false,
+  minify: process.env.NODE_ENV === "production",
   treeShaking: true,
   outfile: "main.js",
   plugins: [
