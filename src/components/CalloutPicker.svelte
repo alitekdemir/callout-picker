@@ -6,11 +6,13 @@
 
   export let settings: PluginSettings;
   export let locale: Locale;
-  export let onSelect: (id: string, fold: 'none' | 'open' | 'closed', firstParaAsTitle: boolean) => void;
+  export let onSelect: (id: string, fold: 'none' | 'open' | 'closed', firstLineAsTitle: boolean) => void;
   export let onClose: () => void;
   export let onSortChange: (mode: 'custom' | 'alpha' | 'frequency') => void;
-  export let selectionWordCount: number = 0;
-  export let hasMultipleParagraphs: boolean = false;
+  export let onMoveCallout: (id: string, direction: 'up' | 'down') => void;
+  export let hasSelection: boolean = false;
+  export let selectionFirstLine: string = '';
+  export let selectionSecondLine: string = '';
   export let existingCallout: string | null = null;
   export let existingCalloutTitle: string = '';
   export let existingCalloutFirstLine: string = '';
@@ -19,17 +21,12 @@
   let focusedIndex = 0;
   let gridEl: HTMLDivElement;
   let foldState: 'none' | 'open' | 'closed' = 'none';
-  let firstParaAsTitle = false;
-  // Track which alias is being hovered for preview update
+  let firstLineAsTitle = false;
   let hoveredAlias: string | null = null;
-  // Sort mode — reactive local var, passed explicitly to getSortedCallouts to fix Svelte tracking
   let sortMode: 'custom' | 'alpha' | 'frequency' = settings.sortMode ?? 'custom';
 
-  // Pass sortMode and settings explicitly so Svelte's reactive system tracks them as dependencies
-  function getSortedCallouts(
-    mode: 'custom' | 'alpha' | 'frequency',
-    s: PluginSettings,
-  ): CalloutDef[] {
+  // Pass sortMode + settings explicitly so Svelte tracks them as reactive dependencies
+  function getSortedCallouts(mode: typeof sortMode, s: PluginSettings): CalloutDef[] {
     const custom = (s.customCallouts ?? []).map(c => ({
       id: c.id, aliases: c.aliases, color: c.color, icon: '', iconPath: c.iconPath,
     }));
@@ -42,7 +39,7 @@
       const counts = s.usageCounts ?? {};
       return [...all].sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0));
     }
-    // custom: apply user-defined order
+    // custom: apply persisted order
     const order = s.calloutOrder ?? [];
     if (!order.length) return all;
     const ordered = order
@@ -55,29 +52,35 @@
   $: displayCallouts = getSortedCallouts(sortMode, settings);
   $: count = displayCallouts.length;
   $: cols = settings.columnCount ?? 3;
-
   $: focusedCallout = displayCallouts[focusedIndex] ?? null;
 
-  // The ID to show in preview: alias hover > focused card
+  // Which id to preview: alias hover takes priority, then focused card
   $: activePreviewId = hoveredAlias ?? focusedCallout?.id ?? null;
-  // Find the owning callout definition (alias hover points to its parent card)
   $: ownerCallout = activePreviewId
     ? (displayCallouts.find(c => c.id === activePreviewId)
-      ?? displayCallouts.find(c => c.aliases.includes(activePreviewId as string))
-      ?? focusedCallout)
+       ?? displayCallouts.find(c => c.aliases.includes(activePreviewId as string))
+       ?? focusedCallout)
     : focusedCallout;
   $: previewColor = ownerCallout?.color ?? '#888';
-  // Title: calloutTitles[owner] or existing title when replacing
-  $: previewTitle = activePreviewId
-    ? (settings.calloutTitles[ownerCallout?.id ?? ''] || existingCalloutTitle)
-    : '';
+
+  // Preview line 1: > [!id][fold] [title]
+  $: previewTitleText = (() => {
+    if (firstLineAsTitle && selectionFirstLine) return selectionFirstLine;
+    if (ownerCallout && settings.calloutTitles[ownerCallout.id]) return settings.calloutTitles[ownerCallout.id];
+    if (existingCalloutTitle) return existingCalloutTitle;
+    return '';
+  })();
   $: previewLine1 = activePreviewId
-    ? `> [!${activePreviewId}]${foldState === 'open' ? '+' : foldState === 'closed' ? '-' : ''}${previewTitle ? ' ' + previewTitle : ''}`
+    ? `> [!${activePreviewId}]${foldState === 'open' ? '+' : foldState === 'closed' ? '-' : ''}${previewTitleText ? ' ' + previewTitleText : ''}`
     : '';
-  // Content line: existing callout content when replacing, otherwise placeholder
-  $: previewLine2 = existingCalloutFirstLine
-    ? `> ${existingCalloutFirstLine}`
-    : `> ${strings.previewContent}`;
+
+  // Preview line 2: actual content
+  $: previewLine2 = (() => {
+    if (firstLineAsTitle && selectionSecondLine) return `> ${selectionSecondLine}`;
+    if (existingCalloutFirstLine) return `> ${existingCalloutFirstLine}`;
+    if (selectionSecondLine) return `> ${selectionSecondLine}`;
+    return `> ${strings.previewContent}`;
+  })();
 
   onMount(() => { gridEl?.focus(); });
 
@@ -90,7 +93,7 @@
       case 'Enter':
       case ' ':
         e.preventDefault();
-        if (count > 0) onSelect(displayCallouts[focusedIndex].id, foldState, firstParaAsTitle);
+        if (count > 0) onSelect(displayCallouts[focusedIndex].id, foldState, firstLineAsTitle);
         break;
       case 'Escape': e.preventDefault(); onClose(); break;
     }
@@ -98,16 +101,16 @@
 
   function handleCardClick(index: number) {
     focusedIndex = index;
-    onSelect(displayCallouts[index].id, foldState, firstParaAsTitle);
+    onSelect(displayCallouts[index].id, foldState, firstLineAsTitle);
   }
 
-  function setSort(mode: typeof sortMode) {
-    sortMode = mode;
-    onSortChange(mode);
+  function handleSortChange(e: Event) {
+    sortMode = (e.target as HTMLSelectElement).value as typeof sortMode;
+    onSortChange(sortMode);
   }
 </script>
 
-<!-- ===== HEADER: title + sort buttons + fold toggle ===== -->
+<!-- ===== HEADER ===== -->
 <div class="cp-header">
   <div class="cp-header-left">
     {#if existingCallout}
@@ -115,30 +118,15 @@
     {:else}
       <span class="cp-title">{strings.modalTitle}</span>
     {/if}
-    {#if selectionWordCount > 0}
-      <span class="cp-badge">{strings.wrapping}: {selectionWordCount}</span>
-    {/if}
   </div>
 
   <div class="cp-header-right">
-    <!-- Sort buttons: ≡  A-Z  ↕ -->
-    <div class="cp-sort-btns">
-      <button
-        class="cp-sort-btn"
-        class:active={sortMode === 'custom'}
-        on:click={() => setSort('custom')}
-        title={strings.sortCustom}>≡</button>
-      <button
-        class="cp-sort-btn"
-        class:active={sortMode === 'alpha'}
-        on:click={() => setSort('alpha')}
-        title={strings.sortAlpha}>A-Z</button>
-      <button
-        class="cp-sort-btn"
-        class:active={sortMode === 'frequency'}
-        on:click={() => setSort('frequency')}
-        title={strings.sortFrequency}>↕</button>
-    </div>
+    <!-- Sort dropdown -->
+    <select class="cp-sort-select" value={sortMode} on:change={handleSortChange}>
+      <option value="custom">{strings.sortCustom}</option>
+      <option value="alpha">{strings.sortAlpha}</option>
+      <option value="frequency">{strings.sortFrequency}</option>
+    </select>
 
     <!-- Fold toggle -->
     <div class="cp-fold">
@@ -163,12 +151,12 @@
   </div>
 </div>
 
-<!-- ===== FIRST-PARA-AS-TITLE CHECKBOX (only when multi-paragraph selected) ===== -->
-{#if hasMultipleParagraphs}
+<!-- ===== FIRST-LINE AS TITLE CHECKBOX (any selection) ===== -->
+{#if hasSelection}
   <!-- svelte-ignore a11y-label-has-associated-control -->
-  <label class="cp-first-para">
-    <input type="checkbox" bind:checked={firstParaAsTitle} />
-    <span>{strings.firstParaAsTitle}</span>
+  <label class="cp-first-line">
+    <input type="checkbox" bind:checked={firstLineAsTitle} />
+    <span>{strings.firstLineAsTitle}</span>
   </label>
 {/if}
 
@@ -215,13 +203,14 @@
           </svg>
           <span class="cp-card__name">{callout.id}</span>
         </div>
+
         {#if callout.aliases.length > 0}
           <div class="cp-card__aliases">
             {#each callout.aliases as alias}
               <!-- svelte-ignore a11y-click-events-have-key-events -->
               <button
                 class="cp-card__alias-chip"
-                on:click|stopPropagation={() => onSelect(alias, foldState, firstParaAsTitle)}
+                on:click|stopPropagation={() => onSelect(alias, foldState, firstLineAsTitle)}
                 on:mouseenter|stopPropagation={() => (hoveredAlias = alias)}
                 on:mouseleave|stopPropagation={() => (hoveredAlias = null)}
                 title={alias}
@@ -229,10 +218,31 @@
             {/each}
           </div>
         {/if}
+
         {#if settings.calloutTitles[callout.id]}
           <span class="cp-card__default-title">"{settings.calloutTitles[callout.id]}"</span>
         {/if}
       </div>
+
+      <!-- Move up/down buttons (custom mode only) -->
+      {#if sortMode === 'custom'}
+        <div class="cp-card-move">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <button
+            class="cp-move-btn"
+            on:click|stopPropagation={() => onMoveCallout(callout.id, 'up')}
+            title="Move up"
+            tabindex="-1"
+          >▲</button>
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <button
+            class="cp-move-btn"
+            on:click|stopPropagation={() => onMoveCallout(callout.id, 'down')}
+            title="Move down"
+            tabindex="-1"
+          >▼</button>
+        </div>
+      {/if}
     </div>
   {/each}
 </div>
@@ -254,17 +264,12 @@
     margin-bottom: 10px;
   }
   .cp-header-left { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-  .cp-header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .cp-header-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 
   .cp-title {
     font-size: 0.9em; font-weight: 600;
     color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .cp-badge {
-    font-size: 0.72em; color: var(--text-on-accent);
-    background: var(--interactive-accent);
-    border-radius: 10px; padding: 1px 7px; white-space: nowrap; flex-shrink: 0;
   }
   .cp-hint {
     font-size: 0.7em; color: var(--text-faint);
@@ -274,25 +279,14 @@
     font-family: var(--font-monospace); white-space: nowrap;
   }
 
-  /* ── Sort buttons ── */
-  .cp-sort-btns { display: flex; gap: 1px; }
-  .cp-sort-btn {
-    padding: 2px 6px;
+  /* ── Sort dropdown ── */
+  .cp-sort-select {
+    padding: 2px 5px;
     border: 1px solid var(--background-modifier-border);
-    background: var(--background-secondary); color: var(--text-faint);
-    cursor: pointer; font-size: 0.78em; line-height: 1.5;
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
+    border-radius: 4px;
+    background: var(--background-secondary); color: var(--text-normal);
+    font-size: 0.78em; cursor: pointer; max-width: 130px;
   }
-  .cp-sort-btn:first-child { border-radius: 4px 0 0 4px; }
-  .cp-sort-btn:last-child { border-radius: 0 4px 4px 0; }
-  .cp-sort-btn:not(:first-child) { margin-left: -1px; }
-  .cp-sort-btn.active {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: var(--interactive-accent);
-    z-index: 1; position: relative;
-  }
-  .cp-sort-btn:hover:not(.active) { background: var(--background-secondary-alt); color: var(--text-normal); }
 
   /* ── Fold toggle ── */
   .cp-fold { display: flex; gap: 1px; }
@@ -304,7 +298,7 @@
     transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
   .cp-fold-btn:first-child { border-radius: 4px 0 0 4px; }
-  .cp-fold-btn:last-child { border-radius: 0 4px 4px 0; }
+  .cp-fold-btn:last-child  { border-radius: 0 4px 4px 0; }
   .cp-fold-btn:not(:first-child) { margin-left: -1px; }
   .cp-fold-btn.active {
     background: var(--interactive-accent);
@@ -313,13 +307,13 @@
     z-index: 1; position: relative;
   }
 
-  /* ── First para as title ── */
-  .cp-first-para {
+  /* ── First-line as title checkbox ── */
+  .cp-first-line {
     display: flex; align-items: center; gap: 6px;
     font-size: 0.82em; color: var(--text-muted);
     margin-bottom: 8px; cursor: pointer;
   }
-  .cp-first-para input[type="checkbox"] { margin: 0; cursor: pointer; }
+  .cp-first-line input[type="checkbox"] { margin: 0; cursor: pointer; }
 
   /* ── Grid ── */
   .cp-grid {
@@ -363,6 +357,8 @@
   .cp-card__body {
     display: flex; flex-direction: column; justify-content: center;
     gap: 3px; padding: 7px 9px; flex: 1; overflow: hidden;
+    /* Leave room for move buttons */
+    padding-right: 28px;
   }
   .cp-card__header { display: flex; align-items: center; gap: 5px; }
   .cp-card__icon { width: 14px; height: 14px; color: var(--callout-color); flex-shrink: 0; }
@@ -389,7 +385,29 @@
     font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* ── Preview (always visible, 2 lines) ── */
+  /* ── Move up/down buttons (custom sort mode) ── */
+  .cp-card-move {
+    position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 1px;
+    opacity: 0; transition: opacity 0.1s; pointer-events: none;
+  }
+  .cp-card:hover .cp-card-move {
+    opacity: 1; pointer-events: auto;
+  }
+  .cp-move-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 18px; height: 16px;
+    padding: 0; border: 1px solid var(--background-modifier-border);
+    border-radius: 3px;
+    background: var(--background-primary); color: var(--text-faint);
+    cursor: pointer; font-size: 0.55em; line-height: 1;
+    transition: background 0.1s, color 0.1s;
+  }
+  .cp-move-btn:hover {
+    background: var(--callout-color); color: #fff; border-color: var(--callout-color);
+  }
+
+  /* ── Preview ── */
   .cp-preview {
     margin-top: 10px;
     padding: 6px 12px;

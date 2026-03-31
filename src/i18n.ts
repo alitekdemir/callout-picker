@@ -22,16 +22,14 @@ const translations = {
     foldClosed: 'Kapalı',
     // Preview
     previewContent: '...',
-    // Wrapping indicator
-    wrapping: 'Sarılıyor',
     // Replace mode
     replacingCallout: 'Değiştiriliyor',
-    // Sort tooltip
-    sortCustom: 'Özel sıra',
-    sortAlpha: 'A-Z',
-    sortFrequency: 'Sık kullanılan',
-    // First-para as title
-    firstParaAsTitle: 'İlk paragrafı başlık yap',
+    // Sort dropdown
+    sortCustom: '≡  Manuel',
+    sortAlpha: '↓AZ  İsme göre',
+    sortFrequency: '↕  Sık kullanılan',
+    // First-line as title
+    firstLineAsTitle: 'İlk satırı başlık yap',
     // Settings
     settingsColumnCount: 'Kolon Sayısı',
     settingsColumnCountDesc: 'Popup ızgarasındaki sütun sayısını seçin.',
@@ -73,16 +71,14 @@ const translations = {
     foldClosed: 'Closed',
     // Preview
     previewContent: '...',
-    // Wrapping indicator
-    wrapping: 'Wrapping',
     // Replace mode
     replacingCallout: 'Replacing',
-    // Sort tooltip
-    sortCustom: 'Custom order',
-    sortAlpha: 'A-Z',
-    sortFrequency: 'Most used',
-    // First-para as title
-    firstParaAsTitle: 'Use first paragraph as title',
+    // Sort dropdown
+    sortCustom: '≡  Manual',
+    sortAlpha: '↓AZ  By name',
+    sortFrequency: '↕  Most used',
+    // First-line as title
+    firstLineAsTitle: 'Use first line as title',
     // Settings
     settingsColumnCount: 'Column Count',
     settingsColumnCountDesc: 'Number of columns in the picker grid.',
