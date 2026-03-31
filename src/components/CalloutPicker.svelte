@@ -140,7 +140,7 @@
   }
 </script>
 
-<!-- ===== HEADER ===== -->
+<!-- ===== ROW 1: Title + hint ===== -->
 <div class="cp-header">
   <div class="cp-header-left">
     {#if existingCallout}
@@ -149,46 +149,49 @@
       <span class="cp-title">{strings.modalTitle}</span>
     {/if}
   </div>
-
-  <div class="cp-header-right">
-    <!-- Sort dropdown -->
-    <select class="cp-sort-select" value={sortMode} on:change={handleSortChange}>
-      <option value="custom">{strings.sortCustom}</option>
-      <option value="alpha">{strings.sortAlpha}</option>
-      <option value="frequency">{strings.sortFrequency}</option>
-    </select>
-
-    <!-- Fold toggle -->
-    <div class="cp-fold">
-      <button
-        class="cp-fold-btn"
-        class:active={foldState === 'none'}
-        on:click={() => (foldState = 'none')}
-        title={strings.foldDefault}>○</button>
-      <button
-        class="cp-fold-btn"
-        class:active={foldState === 'open'}
-        on:click={() => (foldState = 'open')}
-        title={strings.foldOpen}>+</button>
-      <button
-        class="cp-fold-btn"
-        class:active={foldState === 'closed'}
-        on:click={() => (foldState = 'closed')}
-        title={strings.foldClosed}>−</button>
-    </div>
-
-    <kbd class="cp-hint">↑↓←→ Enter</kbd>
-  </div>
+  <kbd class="cp-hint">↑↓←→ Enter</kbd>
 </div>
 
-<!-- ===== FIRST-LINE AS TITLE CHECKBOX ===== -->
-{#if hasSelection}
-  <!-- svelte-ignore a11y-label-has-associated-control -->
-  <label class="cp-first-line">
-    <input type="checkbox" bind:checked={firstLineAsTitle} />
-    <span>{strings.firstLineAsTitle}</span>
-  </label>
-{/if}
+<hr class="cp-divider" />
+
+<!-- ===== ROW 2: firstLineAsTitle + fold + sort ===== -->
+<div class="cp-controls">
+  <div class="cp-controls-left">
+    {#if hasSelection}
+      <!-- svelte-ignore a11y-label-has-associated-control -->
+      <label class="cp-first-line">
+        <input type="checkbox" bind:checked={firstLineAsTitle} />
+        <span>{strings.firstLineAsTitle}</span>
+      </label>
+    {/if}
+  </div>
+
+  <!-- Fold toggle -->
+  <div class="cp-fold">
+    <button
+      class="cp-fold-btn"
+      class:active={foldState === 'none'}
+      on:click={() => (foldState = 'none')}
+      title={strings.foldDefault}>○</button>
+    <button
+      class="cp-fold-btn"
+      class:active={foldState === 'open'}
+      on:click={() => (foldState = 'open')}
+      title={strings.foldOpen}>+</button>
+    <button
+      class="cp-fold-btn"
+      class:active={foldState === 'closed'}
+      on:click={() => (foldState = 'closed')}
+      title={strings.foldClosed}>−</button>
+  </div>
+
+  <!-- Sort dropdown -->
+  <select class="cp-sort-select" value={sortMode} on:change={handleSortChange}>
+    <option value="custom">{strings.sortCustom}</option>
+    <option value="alpha">{strings.sortAlpha}</option>
+    <option value="frequency">{strings.sortFrequency}</option>
+  </select>
+</div>
 
 <!-- ===== CALLOUT GRID ===== -->
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
@@ -276,15 +279,12 @@
 {/if}
 
 <style>
-  /* ── Header ── */
+  /* ── Header (Row 1) ── */
   .cp-header {
-    display: flex; align-items: center; justify-content: space-between; gap: 6px;
-    padding: 0 4px 10px;
-    border-bottom: 1px solid var(--background-modifier-border);
-    margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 8px;
   }
   .cp-header-left { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-  .cp-header-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 
   .cp-title {
     font-size: 0.9em; font-weight: 600;
@@ -296,8 +296,29 @@
     background: var(--background-modifier-hover);
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px; padding: 1px 5px;
-    font-family: var(--font-monospace); white-space: nowrap;
+    font-family: var(--font-monospace); white-space: nowrap; flex-shrink: 0;
   }
+
+  /* ── Divider ── */
+  .cp-divider {
+    border: none;
+    border-top: 1px solid var(--background-modifier-border);
+    margin: 0 0 8px;
+  }
+
+  /* ── Controls row (Row 2) ── */
+  .cp-controls {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 10px;
+  }
+  .cp-controls-left { flex: 1; min-width: 0; }
+
+  /* ── First-line as title ── */
+  .cp-first-line {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.82em; color: var(--text-muted); cursor: pointer;
+  }
+  .cp-first-line input[type="checkbox"] { margin: 0; cursor: pointer; }
 
   /* ── Sort dropdown ── */
   .cp-sort-select {
@@ -305,11 +326,11 @@
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
     background: var(--background-secondary); color: var(--text-normal);
-    font-size: 0.78em; cursor: pointer; max-width: 140px;
+    font-size: 0.78em; cursor: pointer; max-width: 140px; flex-shrink: 0;
   }
 
   /* ── Fold toggle ── */
-  .cp-fold { display: flex; gap: 1px; }
+  .cp-fold { display: flex; gap: 1px; flex-shrink: 0; }
   .cp-fold-btn {
     padding: 2px 7px;
     border: 1px solid var(--background-modifier-border);
@@ -326,14 +347,6 @@
     border-color: var(--interactive-accent);
     z-index: 1; position: relative;
   }
-
-  /* ── First-line as title ── */
-  .cp-first-line {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 0.82em; color: var(--text-muted);
-    margin-bottom: 8px; cursor: pointer;
-  }
-  .cp-first-line input[type="checkbox"] { margin: 0; cursor: pointer; }
 
   /* ── Grid ── */
   .cp-grid {
@@ -363,23 +376,19 @@
     background: var(--background-secondary-alt);
   }
 
-  /* Filled style */
-  .cp-card--filled { background: var(--callout-color); border-color: transparent; }
+  /* Filled style — tinted background matching real Obsidian callout look */
+  .cp-card--filled {
+    background: color-mix(in srgb, var(--callout-color) 14%, var(--background-secondary));
+    border-color: color-mix(in srgb, var(--callout-color) 30%, transparent);
+  }
   .cp-card--filled:hover, .cp-card--filled.cp-card--focused {
-    opacity: 0.88; border-color: transparent;
+    background: color-mix(in srgb, var(--callout-color) 24%, var(--background-secondary));
+    border-color: var(--callout-color);
+    opacity: 1;
   }
-  .cp-card--filled .cp-card__icon { color: rgba(255,255,255,0.95); }
-  .cp-card--filled .cp-card__name { color: rgba(255,255,255,0.95); }
-  .cp-card--filled .cp-drag-grip { color: rgba(255,255,255,0.5); }
-  .cp-card--filled .cp-card__alias-chip {
-    background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.88);
-    border-color: rgba(255,255,255,0.3);
+  .cp-card--filled .cp-card__accent {
+    background: color-mix(in srgb, var(--callout-color) 60%, transparent);
   }
-  .cp-card--filled .cp-card__alias-chip:hover {
-    background: rgba(255,255,255,0.35); color: #fff;
-  }
-  .cp-card--filled .cp-card__default-title { color: rgba(255,255,255,0.7); }
-  .cp-card--filled .cp-card__accent { background: rgba(0,0,0,0.18); }
 
   .cp-card__accent { width: 5px; flex-shrink: 0; background: var(--callout-color); }
   .cp-card__body {

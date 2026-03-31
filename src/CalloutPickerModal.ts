@@ -107,12 +107,17 @@ export class CalloutPickerModal extends Modal {
     return { id, title, content };
   }
 
-  // Returns the first two non-empty lines of the current selection
+  // Returns [full first editor line, second non-empty selection line]
+  // First line uses the full editor line (from col 0) so preview is never truncated
   private getSelectionLines(): [string, string] {
     const sel = this.editor.getSelection().trim();
     if (!sel) return ['', ''];
+    const anchor = this.editor.getCursor('anchor');
+    const head = this.editor.getCursor('head');
+    const fromLine = Math.min(anchor.line, head.line);
+    const firstFullLine = this.editor.getLine(fromLine).trim();
     const lines = sel.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    return [lines[0] ?? '', lines[1] ?? ''];
+    return [firstFullLine || (lines[0] ?? ''), lines[1] ?? ''];
   }
 
   // Expand selection to complete first and last lines before inserting

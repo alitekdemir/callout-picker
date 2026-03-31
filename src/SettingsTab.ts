@@ -108,13 +108,16 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
           cursor: default;
         }
         .cp-order-item.cp-drag-over {
-          border-color: var(--interactive-accent);
-          background: var(--background-modifier-hover);
+          border-color: var(--item-color, var(--interactive-accent));
+          background: color-mix(in srgb, var(--item-color, var(--interactive-accent)) 10%, var(--background-secondary));
         }
         .cp-order-item.cp-dragging { opacity: 0.4; }
         .cp-order-grip {
           font-size: 1em; color: var(--text-faint);
           cursor: grab; flex-shrink: 0; user-select: none;
+        }
+        .cp-order-icon {
+          width: 16px; height: 16px; flex-shrink: 0;
         }
         .cp-order-label {
           flex: 1; font-size: 0.85em; color: var(--text-muted);
@@ -150,11 +153,38 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
         row.setAttribute('draggable', 'true');
         row.dataset.id = callout.id;
 
+        row.style.setProperty('--item-color', callout.color);
+
         const grip = row.createSpan({ cls: 'cp-order-grip', text: '⠿' });
         grip.title = 'Drag to reorder';
 
+        // Colored SVG icon
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = row.createSvg('svg', {
+          cls: 'cp-order-icon',
+          attr: {
+            viewBox: '0 0 24 24',
+            fill: (callout as any).fillIcon ? callout.color : 'none',
+            stroke: (callout as any).fillIcon ? 'none' : callout.color,
+            'stroke-width': '2',
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+          },
+        });
+        if ((callout as any).iconPath) {
+          const path = document.createElementNS(svgNS, 'path');
+          path.setAttribute('d', (callout as any).iconPath);
+          svg.appendChild(path);
+        } else {
+          const circle = document.createElementNS(svgNS, 'circle');
+          circle.setAttribute('cx', '12');
+          circle.setAttribute('cy', '12');
+          circle.setAttribute('r', '5');
+          svg.appendChild(circle);
+        }
+
         const label = row.createSpan({ cls: 'cp-order-label' });
-        label.innerHTML = `<strong>${callout.id}</strong>`;
+        label.innerHTML = `<strong style="color:${callout.color}">${callout.id}</strong>`;
         if (callout.aliases.length) {
           label.innerHTML += `  —  <span style="color:var(--text-faint)">${callout.aliases.join(', ')}</span>`;
         }
