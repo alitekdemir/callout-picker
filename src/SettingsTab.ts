@@ -25,7 +25,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
       this.plugin.settings.language === 'auto' ? detectLocale() : this.plugin.settings.language;
     const strings = t(locale);
 
-    containerEl.createEl('h2', { text: strings.settingsTitle });
+    new Setting(containerEl).setName(strings.settingsTitle).setHeading();
     containerEl.createEl('p', { text: strings.settingsDesc, cls: 'setting-item-description' });
 
     // ── Language ──
@@ -77,7 +77,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
     containerEl.createEl('hr');
 
     // ── Callout Order + Default Titles (F10 + existing) ──
-    containerEl.createEl('h3', { text: strings.settingsOrder });
+    new Setting(containerEl).setName(strings.settingsOrder).setHeading();
     containerEl.createEl('p', { text: strings.settingsOrderDesc, cls: 'setting-item-description' });
 
     const customCallouts = this.plugin.settings.customCallouts ?? [];
@@ -164,16 +164,16 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
           cls: 'cp-order-icon',
           attr: {
             viewBox: '0 0 24 24',
-            fill: (callout as any).fillIcon ? callout.color : 'none',
-            stroke: (callout as any).fillIcon ? 'none' : callout.color,
+            fill: callout.fillIcon ? callout.color : 'none',
+            stroke: callout.fillIcon ? 'none' : callout.color,
             'stroke-width': '2',
             'stroke-linecap': 'round',
             'stroke-linejoin': 'round',
           },
         });
-        if ((callout as any).iconPath) {
+        if (callout.iconPath) {
           const path = document.createElementNS(svgNS, 'path');
-          path.setAttribute('d', (callout as any).iconPath);
+          path.setAttribute('d', callout.iconPath);
           svg.appendChild(path);
         } else {
           const circle = document.createElementNS(svgNS, 'circle');
@@ -184,17 +184,20 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
         }
 
         const label = row.createSpan({ cls: 'cp-order-label' });
-        label.innerHTML = `<strong style="color:${callout.color}">${callout.id}</strong>`;
+        const strong = label.createEl('strong', { text: callout.id });
+        strong.style.color = callout.color;
         if (callout.aliases.length) {
-          label.innerHTML += `  —  <span style="color:var(--text-faint)">${callout.aliases.join(', ')}</span>`;
+          label.appendText('  —  ');
+          const aliasSpan = label.createEl('span', { text: callout.aliases.join(', ') });
+          aliasSpan.style.color = 'var(--text-faint)';
         }
 
-        const titleInput = row.createEl('input', { cls: 'cp-order-title' }) as HTMLInputElement;
+        const titleInput = row.createEl('input', { cls: 'cp-order-title' });
         titleInput.type = 'text';
         titleInput.placeholder = strings.settingsPlaceholder;
         titleInput.title = strings.settingsTitleTemplateHint;
         titleInput.value = this.plugin.settings.calloutTitles[callout.id] ?? '';
-        titleInput.addEventListener('change', async () => {
+        titleInput.addEventListener('change', () => { void (async () => {
           const val = titleInput.value.trim();
           if (val) {
             this.plugin.settings.calloutTitles[callout.id] = val;
@@ -202,7 +205,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
             delete this.plugin.settings.calloutTitles[callout.id];
           }
           await this.plugin.saveSettings();
-        });
+        })(); });
 
         row.addEventListener('dragstart', (e) => {
           dragSrcId = callout.id;
@@ -221,7 +224,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
           }
         });
         row.addEventListener('dragleave', () => row.removeClass('cp-drag-over'));
-        row.addEventListener('drop', async (e) => {
+        row.addEventListener('drop', (e) => { void (async () => {
           e.preventDefault();
           row.removeClass('cp-drag-over');
           if (!dragSrcId || dragSrcId === callout.id) return;
@@ -234,7 +237,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
           this.plugin.settings.calloutOrder = o;
           await this.plugin.saveSettings();
           buildRows();
-        });
+        })(); });
       }
     };
 
@@ -243,7 +246,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
     containerEl.createEl('hr');
 
     // ── Custom Callouts (F4) ──
-    containerEl.createEl('h3', { text: strings.settingsCustomCallouts });
+    new Setting(containerEl).setName(strings.settingsCustomCallouts).setHeading();
     containerEl.createEl('p', { text: strings.settingsCustomDesc, cls: 'setting-item-description' });
 
     for (const custom of customCallouts) {
@@ -269,7 +272,7 @@ export class CalloutPickerSettingsTab extends PluginSettingTab {
     }
 
     // Add custom callout form
-    containerEl.createEl('h4', { text: strings.settingsAddCustom });
+    new Setting(containerEl).setName(strings.settingsAddCustom).setHeading();
 
     let newId = '';
     let newColor = '#888888';

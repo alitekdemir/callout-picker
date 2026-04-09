@@ -92,7 +92,7 @@ export class CalloutPickerModal extends Modal {
   // Strip one level of blockquote + optional callout marker from a line
   private stripQuotePrefix(line: string): string {
     return line
-      .replace(/^>\s*\[![^\]]+\][+\-]?\s*/, '') // strip "> [!type]+ "
+      .replace(/^>\s*\[![^\]]+\][+-]?\s*/, '') // strip "> [!type]+ "
       .replace(/^>\s*/, '');                      // strip remaining "> "
   }
 

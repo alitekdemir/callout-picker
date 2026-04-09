@@ -109,7 +109,7 @@ export type Strings = typeof translations['en'];
 
 export function detectLocale(): Locale {
   const lang: string =
-    (window as any).moment?.locale?.() ?? navigator.language ?? 'en';
+    (window as Window & { moment?: { locale?(): string } }).moment?.locale?.() ?? navigator.language ?? 'en';
   return lang.startsWith('tr') ? 'tr' : 'en';
 }
 

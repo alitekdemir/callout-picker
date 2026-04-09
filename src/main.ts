@@ -11,8 +11,8 @@ export default class CalloutPickerPlugin extends Plugin {
     await this.loadSettings();
 
     this.addCommand({
-      id: 'open-callout-picker',
-      name: 'Callout Picker',
+      id: 'open',
+      name: 'Open callout picker',
       editorCallback: (editor) => {
         new CalloutPickerModal(this.app, editor, this.settings, () => this.saveSettings()).open();
       },
