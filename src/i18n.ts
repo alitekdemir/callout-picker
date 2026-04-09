@@ -26,9 +26,9 @@ const translations = {
     // Replace mode
     replacingCallout: 'Değiştiriliyor',
     // Sort dropdown
-    sortCustom: '≡  Manuel',
-    sortAlpha: '↓AZ  İsme göre',
-    sortFrequency: '↕  Sık kullanılan',
+    sortCustom: 'Manuel',
+    sortAlpha: 'Alfabetik',
+    sortFrequency: 'Sık kullanılan',
     sortSearchPlaceholder: 'Sıralama ara...',
     // First-line as title
     firstLineAsTitle: 'İlk satırı başlık yap',
@@ -77,10 +77,10 @@ const translations = {
     // Replace mode
     replacingCallout: 'Replacing',
     // Sort dropdown
-    sortCustom: '≡  Manual',
-    sortAlpha: '↓AZ  By name',
+    sortCustom: 'Manual',
+    sortAlpha: 'Alphabetical',
     sortSearchPlaceholder: 'Search sort...',
-    sortFrequency: '↕  Most used',
+    sortFrequency: 'Most used',
     // First-line as title
     firstLineAsTitle: 'Use first line as title',
     // Settings
