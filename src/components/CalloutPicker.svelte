@@ -26,13 +26,34 @@
   let hoveredAlias: string | null = null;
   let sortMode: 'custom' | 'alpha' | 'frequency' = settings.sortMode ?? 'custom';
 
-  // Sort combobox state
-  let sortOpen = false;
-
   // Drag-drop state (svelte-dnd-action)
   const FLIP_DURATION_MS = 200;
   let isDragging = false;
   let dndItems: CalloutDef[] = [];
+
+  // ── Inline Lucide SVG path strings ──────────────────────────────────────
+  const ICO_POINTER =
+    '<path d="M22 14a8 8 0 0 1-8 8"/>' +
+    '<path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/>' +
+    '<path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/>' +
+    '<path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/>' +
+    '<path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>';
+
+  const ICO_ARROW_DOWN_10 =
+    '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/>' +
+    '<path d="M17 10V4h-2"/><path d="M15 10h4"/>' +
+    '<rect x="15" y="14" width="4" height="6" ry="2"/>';
+
+  const ICO_ARROW_DOWN_AZ =
+    '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/>' +
+    '<path d="M20 8h-5"/>' +
+    '<path d="M15 10V6.5a2.5 2.5 0 0 1 5 0V10"/>' +
+    '<path d="M15 14h5l-5 6h5"/>';
+
+  $: sortIconHtml =
+    sortMode === 'custom'    ? ICO_POINTER      :
+    sortMode === 'frequency' ? ICO_ARROW_DOWN_10 :
+                               ICO_ARROW_DOWN_AZ;
 
   function getSortedCallouts(mode: typeof sortMode, s: PluginSettings): CalloutDef[] {
     const custom = (s.customCallouts ?? []).map(c => ({
@@ -64,7 +85,6 @@
     : focusedCallout;
   $: previewColor = ownerCallout?.color ?? '#888';
 
-  // firstLineAsTitle applies whenever there is a selection (insert OR replace mode)
   $: showFirstLineOption = hasSelection;
 
   $: activeTitleText =
@@ -82,18 +102,13 @@
     : selectionSecondLine ? `> ${selectionSecondLine}`
     : `> ${strings.previewContent}`;
 
-  // Sort options for combobox
-  $: sortOptions = [
-    { value: 'custom' as const,    label: strings.sortCustom },
-    { value: 'alpha' as const,     label: strings.sortAlpha },
-    { value: 'frequency' as const, label: strings.sortFrequency },
-  ];
-  $: currentSortLabel = sortOptions.find(o => o.value === sortMode)?.label ?? strings.sortCustom;
-
-  onMount(() => { gridEl?.focus(); });
+  onMount(() => {
+    gridEl?.focus();
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
 
   function handleKeydown(e: KeyboardEvent) {
-    if (sortOpen) { if (e.key === 'Escape') { sortOpen = false; } return; }
     switch (e.key) {
       case 'ArrowRight': e.preventDefault(); focusedIndex = (focusedIndex + 1) % count; break;
       case 'ArrowLeft':  e.preventDefault(); focusedIndex = (focusedIndex - 1 + count) % count; break;
@@ -113,14 +128,10 @@
     onSelect(dndItems[index].id, foldState, firstLineAsTitle);
   }
 
-  function openSort() {
-    sortOpen = true;
-  }
-
   function selectSort(mode: typeof sortMode) {
     sortMode = mode;
-    sortOpen = false;
     onSortChange(mode);
+    gridEl?.focus();
   }
 
   // svelte-dnd-action handlers
@@ -147,64 +158,51 @@
 
 <hr class="cp-divider" />
 
-<!-- ===== ROW 2: left cluster (checkbox + fold) | right (sort) ===== -->
+<!-- ===== ROW 2: Sort only (right-aligned) ===== -->
 <div class="cp-controls">
-  <div class="cp-controls-left">
-    {#if showFirstLineOption}
-      <!-- svelte-ignore a11y-label-has-associated-control -->
-      <label class="cp-first-line">
-        <input type="checkbox" bind:checked={firstLineAsTitle} />
-        <span>{strings.firstLineAsTitle}</span>
-      </label>
-    {/if}
-
-    <!-- Fold toggle with label -->
-    <div class="cp-fold-group">
-      <span class="cp-fold-label">{strings.foldLabel}:</span>
-      <div class="cp-fold">
-        <button class="cp-fold-btn" class:active={foldState === 'none'}
-          on:click={() => (foldState = 'none')} title={strings.foldDefault}>{strings.foldDefault}</button>
-        <button class="cp-fold-btn" class:active={foldState === 'open'}
-          on:click={() => (foldState = 'open')} title={strings.foldOpen}>{strings.foldOpen}</button>
-        <button class="cp-fold-btn" class:active={foldState === 'closed'}
-          on:click={() => (foldState = 'closed')} title={strings.foldClosed}>{strings.foldClosed}</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sort combobox (right-anchored) -->
+  <!-- Sort hover dropdown -->
   <div class="cp-sort-wrap">
-    <button class="cp-sort-btn" on:click={openSort} aria-haspopup="listbox">
-      <span>{currentSortLabel}</span>
-      <svg class="cp-sort-chevron" class:open={sortOpen} viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="6 9 12 15 18 9" />
+    <button class="cp-sort-btn" aria-label="Sort">
+      <span class="cp-sort-label">Sırala</span>
+      <span class="cp-sort-sep">:</span>
+      <svg class="cp-sort-icon cp-sort-current" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        {@html sortIconHtml}
       </svg>
     </button>
 
-    {#if sortOpen}
+    <div class="cp-sort-popover" role="listbox">
       <!-- svelte-ignore a11y-click-events-have-key-events -->
-      <!-- svelte-ignore a11y-no-static-element-interactions -->
-      <div class="cp-sort-backdrop" on:click={() => { sortOpen = false; }} />
-      <div class="cp-sort-popover" role="listbox">
-        {#each sortOptions as opt}
-          <button
-            class="cp-sort-item"
-            class:selected={sortMode === opt.value}
-            role="option"
-            aria-selected={sortMode === opt.value}
-            on:click={() => selectSort(opt.value)}
-          >
-            <svg class="cp-sort-check" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-              style="opacity: {sortMode === opt.value ? 1 : 0}">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>{opt.label}</span>
-          </button>
-        {/each}
-      </div>
-    {/if}
+      <button class="cp-sort-item" class:selected={sortMode === 'custom'}
+        role="option" aria-selected={sortMode === 'custom'}
+        on:click={() => selectSort('custom')}>
+        <svg class="cp-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          {@html ICO_POINTER}
+        </svg>
+        <span>{strings.sortCustom}</span>
+      </button>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <button class="cp-sort-item" class:selected={sortMode === 'frequency'}
+        role="option" aria-selected={sortMode === 'frequency'}
+        on:click={() => selectSort('frequency')}>
+        <svg class="cp-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          {@html ICO_ARROW_DOWN_10}
+        </svg>
+        <span>{strings.sortFrequency}</span>
+      </button>
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <button class="cp-sort-item" class:selected={sortMode === 'alpha'}
+        role="option" aria-selected={sortMode === 'alpha'}
+        on:click={() => selectSort('alpha')}>
+        <svg class="cp-sort-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          {@html ICO_ARROW_DOWN_AZ}
+        </svg>
+        <span>{strings.sortAlpha}</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -281,13 +279,36 @@
   {/each}
 </div>
 
-<!-- ===== PREVIEW ===== -->
-{#if previewLine1}
-  <div class="cp-preview" style="--preview-color: {previewColor}">
-    <pre class="cp-preview-text">{previewLine1}
-{previewLine2}</pre>
-  </div>
+<!-- ===== BOTTOM: divider → checkbox → preview + fold stack ===== -->
+<hr class="cp-divider cp-divider--bottom" />
+
+{#if showFirstLineOption}
+  <!-- svelte-ignore a11y-label-has-associated-control -->
+  <label class="cp-first-line">
+    <input type="checkbox" bind:checked={firstLineAsTitle} />
+    <span>{strings.firstLineAsTitle}</span>
+  </label>
 {/if}
+
+<div class="cp-preview-row">
+  {#if previewLine1}
+    <div class="cp-preview" style="--preview-color: {previewColor}">
+      <pre class="cp-preview-text">{previewLine1}
+{previewLine2}</pre>
+    </div>
+  {:else}
+    <div class="cp-preview cp-preview--empty" />
+  {/if}
+
+  <div class="cp-fold-stack">
+    <button class="cp-fold-btn" class:active={foldState === 'open'}
+      on:click={() => (foldState = 'open')} title={strings.foldOpen}>+</button>
+    <button class="cp-fold-btn" class:active={foldState === 'closed'}
+      on:click={() => (foldState = 'closed')} title={strings.foldClosed}>−</button>
+    <button class="cp-fold-btn" class:active={foldState === 'none'}
+      on:click={() => (foldState = 'none')} title={strings.foldDefault}>•</button>
+  </div>
+</div>
 
 <style>
   /* ── Header ── */
@@ -310,91 +331,63 @@
 
   /* ── Divider ── */
   .cp-divider { border: none; border-top: 1px solid var(--background-modifier-border); margin: 0 0 8px; }
+  .cp-divider--bottom { margin: 8px 0; }
 
-  /* ── Controls row ── */
+  /* ── Controls row: sort only, right-aligned ── */
   .cp-controls {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px; margin-bottom: 10px;
-  }
-  .cp-controls-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
-
-  /* ── First-line checkbox ── */
-  .cp-first-line {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 0.82em; color: var(--text-muted); cursor: pointer; white-space: nowrap;
-  }
-  .cp-first-line input[type="checkbox"] { margin: 0; cursor: pointer; }
-
-  /* ── Fold group ── */
-  .cp-fold-group { display: flex; align-items: center; gap: 4px; }
-  .cp-fold-label { font-size: 0.78em; color: var(--text-faint); white-space: nowrap; }
-  .cp-fold { display: flex; }
-  .cp-fold-btn {
-    padding: 2px 8px;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-secondary); color: var(--text-muted);
-    cursor: pointer; font-size: 0.78em; line-height: 1.6; white-space: nowrap;
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
-  }
-  .cp-fold-btn:first-child { border-radius: 4px 0 0 4px; }
-  .cp-fold-btn:last-child  { border-radius: 0 4px 4px 0; }
-  .cp-fold-btn:not(:first-child) { margin-left: -1px; }
-  .cp-fold-btn.active {
-    background: var(--interactive-accent); color: var(--text-on-accent);
-    border-color: var(--interactive-accent); z-index: 1; position: relative;
+    display: flex; align-items: center; justify-content: flex-end;
+    margin-bottom: 8px;
   }
 
-  /* ── Sort combobox ── */
+  /* ── Sort hover dropdown ── */
   .cp-sort-wrap { position: relative; flex-shrink: 0; }
 
   .cp-sort-btn {
-    display: flex; align-items: center; gap: 5px;
-    padding: 3px 8px 3px 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 6px;
-    background: var(--background-secondary); color: var(--text-muted);
-    font-size: 0.8em; cursor: pointer; white-space: nowrap;
-    transition: border-color 0.1s, background 0.1s, color 0.1s;
+    display: flex; align-items: center; gap: 4px;
+    padding: 3px 6px; border: none; border-radius: 4px;
+    background: transparent; color: var(--text-faint);
+    font-size: 0.8em; cursor: pointer;
+    transition: background 0.1s, color 0.1s;
   }
-  .cp-sort-btn:hover {
-    border-color: var(--text-muted);
-    background: var(--background-secondary-alt);
-    color: var(--text-normal);
-  }
-  .cp-sort-chevron {
-    width: 11px; height: 11px; flex-shrink: 0;
-    transition: transform 0.15s ease;
-  }
-  .cp-sort-chevron.open { transform: rotate(180deg); }
+  .cp-sort-wrap:hover .cp-sort-btn { background: var(--background-modifier-hover); color: var(--text-muted); }
 
-  .cp-sort-backdrop { position: fixed; inset: 0; z-index: 99; }
+  .cp-sort-label { font-size: 0.78em; color: inherit; }
+  .cp-sort-sep { color: var(--text-faint); font-size: 0.85em; line-height: 1; }
 
+  .cp-sort-icon {
+    width: 14px; height: 14px; flex-shrink: 0;
+    overflow: visible;
+  }
+
+  /* Popover hidden by default, shown on hover */
   .cp-sort-popover {
-    position: absolute; top: calc(100% + 5px); right: 0;
-    z-index: 100; width: 200px;
+    display: none;
+    position: absolute; top: 100%; right: 0;
+    z-index: 100;
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-    overflow: hidden;
-    padding: 4px 0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    padding: 4px 0; min-width: 130px;
   }
+  .cp-sort-wrap:hover .cp-sort-popover { display: block; }
 
   .cp-sort-item {
     display: flex; align-items: center; gap: 7px;
-    width: 100%; text-align: left;
-    padding: 7px 10px;
-    border: none; border-radius: 0;
-    background: transparent; color: var(--text-normal);
-    font-size: 0.85em; cursor: pointer;
-    transition: background 0.1s;
+    width: 100%; padding: 5px 10px;
+    border: none; background: transparent; text-align: left;
+    color: var(--text-muted); cursor: pointer; font-size: 0.82em;
+    transition: background 0.1s, color 0.1s;
+    min-height: unset; height: auto;
   }
-  .cp-sort-item:hover { background: var(--background-modifier-hover); }
-  .cp-sort-item.selected { font-weight: 600; }
-  .cp-sort-check { width: 13px; height: 13px; flex-shrink: 0; color: var(--interactive-accent); }
+  .cp-sort-item:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+  .cp-sort-item.selected { color: var(--interactive-accent); font-weight: 600; }
 
   /* ── Grid ── */
-  .cp-grid { display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); gap: 7px; outline: none; }
+  .cp-grid {
+    display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr);
+    gap: 7px; outline: none; margin-bottom: 0;
+  }
 
   /* ── Card ── */
   .cp-card {
@@ -424,8 +417,8 @@
 
   .cp-card__accent { width: 5px; flex-shrink: 0; background: var(--callout-color); }
   .cp-card__body {
-    display: flex; flex-direction: column; justify-content: center;
-    gap: 3px; padding: 7px 9px; flex: 1; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: flex-start;
+    gap: 3px; padding: 6px 9px; flex: 1; overflow: hidden;
   }
   .cp-card__header { display: flex; align-items: center; gap: 5px; }
 
@@ -443,12 +436,15 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
   }
 
-  .cp-card__aliases { display: flex; flex-wrap: wrap; gap: 3px; }
+  .cp-card__aliases { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
   .cp-card__alias-chip {
-    font-size: 0.68em; padding: 1px 5px;
+    height: 20px !important;
+    min-height: unset !important;
+    box-sizing: border-box;
+    font-size: 0.65em; padding: 0 4px;
     border-radius: 3px; border: 1px solid var(--background-modifier-border);
     background: var(--background-modifier-hover); color: var(--text-faint);
-    cursor: pointer; line-height: 1.4;
+    cursor: pointer; line-height: 20px;
     transition: background 0.1s, color 0.1s, border-color 0.1s;
   }
   .cp-card__alias-chip:hover { background: var(--callout-color); color: #fff; border-color: var(--callout-color); }
@@ -457,15 +453,50 @@
     font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* ── Preview ── */
+  /* ── First-line checkbox ── */
+  .cp-first-line {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.82em; color: var(--text-muted); cursor: pointer;
+    white-space: nowrap; margin-bottom: 5px;
+  }
+  .cp-first-line input[type="checkbox"] { margin: 0; cursor: pointer; }
+
+  /* ── Preview row: preview (flex:1) + fold stack ── */
+  .cp-preview-row { display: flex; align-items: stretch; gap: 6px; }
+
   .cp-preview {
-    margin-top: 10px; padding: 6px 12px;
+    flex: 1; padding: 6px 12px;
     border-left: 4px solid var(--preview-color, #888);
     background: var(--background-secondary); border-radius: 0 4px 4px 0;
   }
+  .cp-preview--empty { min-height: 44px; border-left-color: var(--background-modifier-border); }
   .cp-preview-text {
     font-family: var(--font-monospace); font-size: 0.8em;
     color: var(--text-normal); margin: 0;
     white-space: pre; line-height: 1.7; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── Fold stack: 3 stacked vertical buttons ── */
+  .cp-fold-stack { display: flex; flex-direction: column; flex-shrink: 0; }
+  .cp-fold-btn {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 10px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary); color: var(--text-muted);
+    cursor: pointer; font-size: 0.85em; white-space: nowrap;
+    min-height: unset; height: auto;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+  }
+  .cp-fold-btn:first-child { border-radius: 4px 4px 0 0; }
+  .cp-fold-btn:last-child  { border-radius: 0 0 4px 4px; }
+  .cp-fold-btn:not(:first-child) { margin-top: -1px; }
+  .cp-fold-btn.active {
+    background: var(--interactive-accent); color: var(--text-on-accent);
+    border-color: var(--interactive-accent); z-index: 1; position: relative;
+  }
+  .cp-fold-btn:hover:not(.active) {
+    background: var(--background-secondary-alt);
+    color: var(--text-normal);
   }
 </style>
