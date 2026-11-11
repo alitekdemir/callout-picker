@@ -215,4 +215,4 @@ callout-picker/
  
 ## Lisans
  
-MIT © [Ali Tekdemir](https://github.com/alitekdemir)
+MIT © [Ali Tekdemir](https://github.com/alitekdemir) · [Projeye Destek Olun](https://github.com/sponsors/alitekdemir)
